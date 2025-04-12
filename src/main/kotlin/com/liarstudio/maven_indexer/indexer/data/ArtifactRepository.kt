@@ -79,6 +79,19 @@ class ArtifactRepository {
             updateVersionMetadata(releaseVersion, VersionDao.isRelease, artifactDatabaseId)
         }
 
+        syncFTSIndex()
+
+    }
+
+    fun syncFTSIndex() = transaction {
+        exec(
+            """
+        INSERT INTO artifacts_fts(rowid, group_id, artifact_id)
+        SELECT a.id, a.group_id, a.artifact_id
+        FROM artifacts a
+        WHERE a.id NOT IN (SELECT rowid FROM artifacts_fts);
+    """.trimIndent()
+        )
     }
 
     private fun updateVersionMetadata(
@@ -99,19 +112,26 @@ class ArtifactRepository {
 
     suspend fun getArtifacts(query: String, limit: Int = 50): List<IndexedArtifact> =
         transaction {
-            (ArtifactDao innerJoin VersionDao)
-                .select {
-                    ((ArtifactDao.groupId like "%$query%") or (ArtifactDao.artifactId like "%$query%")) and (VersionDao.isLatest eq true)
-                }
-                .orderBy(ArtifactDao.groupId to SortOrder.ASC, ArtifactDao.artifactId to SortOrder.ASC)
-                .limit(limit)
-                .map {
+            exec(
+                """
+        SELECT a.group_id, a.artifact_id, v.version
+        FROM artifacts_fts f
+        JOIN versions v ON f.rowid = v.id
+        JOIN artifacts a ON a.id = v.artifact
+        WHERE artifacts_fts MATCH 'kotlin'
+          AND v.is_latest = 1
+    """.trimIndent(),
+
+            ) {
+                val results = mutableListOf<IndexedArtifact>()
+                while (it.next()) {
                     IndexedArtifact(
-                        groupId = it[ArtifactDao.groupId],
-                        artifactId = it[ArtifactDao.artifactId],
-                        version = it[VersionDao.version],
+                        groupId = it.getString("group_id"),
+                        artifactId = it.getString("artifact_id"),
+                        version = it.getString("version")
                     )
                 }
-        }
-
+                results
+            }
+        } ?: emptyList()
 }

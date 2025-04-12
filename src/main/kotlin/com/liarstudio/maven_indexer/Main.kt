@@ -31,7 +31,16 @@ fun main(args: Array<String>) {
     val dotenv = dotenv { ignoreIfMissing = true }
     val dbPath = dotenv["DB_PATH"] ?: "maven.db"
     Database.connect("jdbc:sqlite:$dbPath", driver = "org.sqlite.JDBC")
-    transaction { SchemaUtils.create(ArtifactDao, VersionDao) }
+    transaction {
+        SchemaUtils.create(ArtifactDao, VersionDao)
+        exec(
+            """
+        CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fts
+        USING fts5(group_id, artifact_id);
+    """.trimIndent()
+        )
+//        exec("INSERT INTO artifacts_fts(artifacts_fts) VALUES('rebuild');")
+    }
 
 
     val artifactRepository = ArtifactRepository()
