@@ -12,6 +12,7 @@ import org.jetbrains.exposed.sql.Column
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insertAndGetId
@@ -27,19 +28,58 @@ class ArtifactStorage {
         val dotenv = dotenv { ignoreIfMissing = true }
         val dbPath = dotenv["DB_PATH"] ?: "maven.db"
         Database.connect("jdbc:sqlite:$dbPath", driver = "org.sqlite.JDBC")
-        transaction { SchemaUtils.create(ArtifactDao, VersionDao) }
+        transaction {
+            SchemaUtils.create(ArtifactDao, VersionDao)
+            exec(
+                """
+                        CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fuzzy_index
+                        USING fts5(group_id, artifact_id, content='', columnsize=1);
+                """
+            )
+        }
     }
 
     suspend fun saveArtifact(artifact: Artifact, versionsMetadata: VersionMetadata) {
         mutex.withLock {
             transaction {
                 val artifactDatabaseId = updateArtifact(artifact)
+                updateArtifactTrigrams(artifact, artifactDatabaseId)
                 updateVersions(
                     artifactDatabaseId = artifactDatabaseId,
                     versionsMetadata = versionsMetadata,
                 )
             }
         }
+    }
+
+    private fun Transaction.updateArtifactTrigrams(artifact: Artifact, artifactDatabaseId: Long) {
+        val trigramGroup = generateTrigramString(artifact.groupId)
+        val trigramArtifact = generateTrigramString(artifact.artifactId)
+        val fuzzyIndexAlreadyExists = exec(
+            """
+            SELECT 1 FROM artifacts_fuzzy_index WHERE rowid = $artifactDatabaseId
+            """
+        ) { it.next() } == true
+
+        if (!fuzzyIndexAlreadyExists) {
+            exec(
+                """
+        INSERT INTO artifacts_fuzzy_index(rowid, group_id, artifact_id)
+        VALUES ($artifactDatabaseId, '$trigramGroup', '$trigramArtifact')
+    """
+            )
+        }
+    }
+
+    private fun generateTrigramString(word: String, separator: String = " "): String {
+        val input = word.lowercase().normalize()
+        return (0..input.length - 3).joinToString(separator) { i ->
+            input.substring(i, i + 3)
+        }
+    }
+
+    fun String.normalize(): String {
+        return filter(Char::isLetterOrDigit)
     }
 
     private fun updateArtifact(artifact: Artifact): Long {
@@ -86,7 +126,6 @@ class ArtifactStorage {
         if (releaseVersion != null) {
             updateVersionMetadata(releaseVersion, VersionDao.isRelease, artifactDatabaseId)
         }
-
     }
 
     private fun updateVersionMetadata(
@@ -107,36 +146,30 @@ class ArtifactStorage {
 
     fun getArtifacts(query: String, limit: Int = 50): List<IndexedArtifact> =
         transaction {
+            val trigrams = generateTrigramString(query, " OR ")
             exec(
                 """
-                SELECT group_id, artifact_id, v.version 
-                FROM artifacts a
-                    JOIN versions v ON v.artifact = a.id
-                WHERE (artifact_id LIKE '%$query%' OR group_id LIKE '%$query%') AND v.is_latest = 1
-                ORDER BY 
-                    CASE
-                        WHEN artifact_id = '$query' THEN 6
-                        WHEN group_id = '$query' THEN 5
-                        WHEN artifact_id LIKE '$query%' THEN 4
-                        WHEN artifact_id LIKE '%$query%' THEN 3
-                        WHEN group_id LIKE '$query%' THEN 2
-                        WHEN group_id LIKE '%$query%' THEN 1
-                        ELSE 0
-                    END DESC
-                LIMIT $limit
-                """.trimIndent()
+        SELECT a.group_id, a.artifact_id, v.version, bm25(artifacts_fuzzy_index) as score
+        FROM artifacts_fuzzy_index f
+        JOIN artifacts a ON a.id = f.rowid
+        JOIN versions v ON a.id = v.artifact
+        WHERE artifacts_fuzzy_index MATCH '$trigrams'
+          AND v.is_latest = 1
+        ORDER by score ASC
+        LIMIT $limit
+    """.trimIndent(),
             ) {
                 val results = mutableListOf<IndexedArtifact>()
                 while (it.next()) {
                     results += IndexedArtifact(
-                        groupId = it.getString(ArtifactDao.groupId.name),
-                        artifactId = it.getString(ArtifactDao.artifactId.name),
-                        version = it.getString(VersionDao.version.name),
+                        groupId = it.getString("group_id"),
+                        artifactId = it.getString("artifact_id"),
+                        version = it.getString("version")
                     )
                 }
                 results
-            } ?: emptyList()
-        }
+            }
+        } ?: emptyList()
 
     fun getArtifactTargets(artifact: Artifact): List<String> = transaction {
         ArtifactDao.select { (artifactId like "${artifact.artifactId}%") and (groupId eq artifact.groupId) }
