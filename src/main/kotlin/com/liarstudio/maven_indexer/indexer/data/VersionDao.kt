@@ -2,7 +2,7 @@ package com.liarstudio.maven_indexer.indexer.data
 
 import org.jetbrains.exposed.dao.id.LongIdTable
 
-object VersionDao : LongIdTable("artifact_versions", "version_id") {
+object VersionDao : LongIdTable("versions") {
     val artifact = reference("artifact", ArtifactDao)
     val version = varchar("version", 100)
 

@@ -13,6 +13,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.runBlocking
+import org.slf4j.LoggerFactory
 import java.io.File
 
 fun main(args: Array<String>) {
@@ -38,7 +39,6 @@ fun main(args: Array<String>) {
     val indexer = ArtifactIndexer(artifactRepository)
     val searcher = ArtifactSearcher(artifactRepository)
 
-
     runBlocking {
         when {
             index == true -> FullMavenArtifactCrawler().crawlAndIndex(indexer)
@@ -48,8 +48,11 @@ fun main(args: Array<String>) {
             }
 
             indexFromCsv != null -> CsvArtifactCrawler(File(indexFromCsv!!)).crawlAndIndex(indexer)
-            search != null -> searcher.search(search!!)
-                .map { result -> println("$result") }
+            search != null -> searcher.search(search!!, limit = 20)
+                .mapIndexed { i, result ->
+                    val printingIndex = if (i < 9) "0${i + 1}" else "${i + 1}"
+                    println("$printingIndex. $result")
+                }
 
             else -> println("Use --help to see options.")
         }

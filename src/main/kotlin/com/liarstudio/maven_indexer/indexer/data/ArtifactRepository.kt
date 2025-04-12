@@ -99,19 +99,35 @@ class ArtifactRepository {
 
     suspend fun getArtifacts(query: String, limit: Int = 50): List<IndexedArtifact> =
         transaction {
-            (ArtifactDao innerJoin VersionDao)
-                .select {
-                    ((ArtifactDao.groupId like "%$query%") or (ArtifactDao.artifactId like "%$query%")) and (VersionDao.isLatest eq true)
-                }
-                .orderBy(ArtifactDao.groupId to SortOrder.ASC, ArtifactDao.artifactId to SortOrder.ASC)
-                .limit(limit)
-                .map {
-                    IndexedArtifact(
-                        groupId = it[ArtifactDao.groupId],
-                        artifactId = it[ArtifactDao.artifactId],
-                        version = it[VersionDao.version],
+            exec(
+                """
+                SELECT group_id, artifact_id, v.version 
+                FROM artifacts a
+                    JOIN versions v ON v.artifact = a.id
+                WHERE (artifact_id LIKE '%$query%' OR group_id LIKE '%$query%') AND v.is_latest = 1
+                ORDER BY 
+                    CASE
+                        WHEN artifact_id = '$query' THEN 6
+                        WHEN group_id = '$query' THEN 5
+                        WHEN artifact_id LIKE '$query%' THEN 4
+                        WHEN artifact_id LIKE '%$query%' THEN 3
+                        WHEN group_id LIKE '$query%' THEN 2
+                        WHEN group_id LIKE '%$query%' THEN 1
+                        ELSE 0
+                    END DESC
+                LIMIT $limit
+                """.trimIndent()
+            ) {
+                val results = mutableListOf<IndexedArtifact>()
+                while (it.next()) {
+                    results += IndexedArtifact(
+                        groupId = it.getString(ArtifactDao.groupId.name),
+                        artifactId = it.getString(ArtifactDao.artifactId.name),
+                        version = it.getString(VersionDao.version.name),
                     )
                 }
+                results
+            } ?:  emptyList()
         }
 
 }
