@@ -31,7 +31,6 @@ class CsvArtifactCrawler(private val csvFile: File) : ArtifactCrawler {
         artifacts.map {
             async {
                 indexer.indexArtifact(it)
-                println("${Thread.currentThread().name} $it indexed")
             }
         }
             .awaitAll()

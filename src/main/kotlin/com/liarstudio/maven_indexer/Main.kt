@@ -3,7 +3,9 @@ package com.liarstudio.maven_indexer
 import com.liarstudio.maven_indexer.crawler.CsvArtifactCrawler
 import com.liarstudio.maven_indexer.crawler.FullMavenArtifactCrawler
 import com.liarstudio.maven_indexer.indexer.ArtifactIndexer
-import com.liarstudio.maven_indexer.indexer.data.IndexedArtifactDao
+import com.liarstudio.maven_indexer.indexer.data.ArtifactDao
+import com.liarstudio.maven_indexer.indexer.data.ArtifactRepository
+import com.liarstudio.maven_indexer.indexer.data.VersionDao
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.searcher.ArtifactSearcher
 import kotlinx.cli.*
@@ -26,14 +28,15 @@ fun main(args: Array<String>) {
     val indexFromCsv by parser.option(ArgType.String, shortName = "icsv", description = "Index from CSV file")
 
     parser.parse(args)
-
     val dotenv = dotenv { ignoreIfMissing = true }
     val dbPath = dotenv["DB_PATH"] ?: "maven.db"
     Database.connect("jdbc:sqlite:$dbPath", driver = "org.sqlite.JDBC")
-    transaction { SchemaUtils.create(IndexedArtifactDao) }
+    transaction { SchemaUtils.create(ArtifactDao, VersionDao) }
 
 
-    val indexer = ArtifactIndexer()
+    val artifactRepository = ArtifactRepository()
+    val indexer = ArtifactIndexer(artifactRepository)
+    val searcher = ArtifactSearcher(artifactRepository)
 
 
     runBlocking {
@@ -45,8 +48,9 @@ fun main(args: Array<String>) {
             }
 
             indexFromCsv != null -> CsvArtifactCrawler(File(indexFromCsv!!)).crawlAndIndex(indexer)
-            search != null -> ArtifactSearcher().search(search!!)
-                .map { result ->  println("$result") }
+            search != null -> searcher.search(search!!)
+                .map { result -> println("$result") }
+
             else -> println("Use --help to see options.")
         }
     }
