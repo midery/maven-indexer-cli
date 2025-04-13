@@ -2,45 +2,67 @@ package com.liarstudio.maven_indexer.crawler
 
 import com.liarstudio.maven_indexer.indexer.ArtifactIndexer
 import com.liarstudio.maven_indexer.models.Artifact
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
+import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * TODO: Test this logic
  * TODO: Parallel IO execution
  * TODO: Error handling
  */
-class FullMavenArtifactCrawler(private val startUrl: String = MAVEN_CENTRAL_REPO_URL) : ArtifactCrawler {
+class FullMavenArtifactCrawler(
+    private val startUrl: String = MAVEN_CENTRAL_REPO_URL,
+) : ArtifactCrawler {
 
-    override suspend fun crawlAndIndex(indexer: ArtifactIndexer) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+    private val visited = ConcurrentHashMap.newKeySet<String>()
+    private val channel = Channel<String>(capacity = Channel.UNLIMITED)
 
-        val queue = ArrayDeque<String>()
-        queue.add(startUrl)
 
-        while (queue.isNotEmpty()) {
-            val url = queue.removeFirst()
+    override suspend fun crawlAndIndex(indexer: ArtifactIndexer) = withContext(Dispatchers.IO) {
+        channel.send(startUrl)
 
-            val html = runCatching { Jsoup.connect(url).get() }.getOrNull() ?: continue
-            val links = html.select("a[href]")
+        repeat(64) {
+            launch {
+                for (url in channel) {
+                    if (!visited.add(url)) continue
+                    logger.debug("Processing: $url")
+                    val html = runCatching { Jsoup.connect(url).get() }.getOrNull() ?: continue
+                    logger.debug("Processing HTML...")
 
-            for (link in links) {
-                val href = link.attr("href")
-                if (href == "../") continue
+                    val links = html.select("a[href]")
+                    logger.debug("Found links: ${links.size}")
 
-                val fullUrl = url + href
-                if (href.endsWith("/")) {
-                    queue.add(fullUrl)
-                } else if (href.endsWith("maven-metadata.xml")) {
-                    val path = url.removePrefix(startUrl).trim('/')
-                    val segments = path.split('/')
+                    for (link in links) {
+                        val href = link.attr("href")
+                        logger.debug("Found link: $href")
+                        if (href == "../") continue
 
-                    if (segments.size >= 2) {
-                        val artifact = Artifact(
-                            artifactId = segments.last(),
-                            groupId = segments.dropLast(1).joinToString(".")
-                        )
+                        val fullUrl = url + href
+                        if (href.endsWith("/")) {
+                            logger.debug("Adding link to the queue: $href")
+                            channel.send(fullUrl)
+                        } else if (href.endsWith("maven-metadata.xml")) {
+                            logger.debug("Metadata found! $fullUrl")
+                            val path = url.removePrefix(startUrl).trim('/')
+                            val segments = path.split('/')
 
-                        println("📦 Found artifact: $artifact")
-                        indexer.indexArtifact(artifact)
+                            if (segments.size >= 2) {
+                                val artifact = Artifact(
+                                    artifactId = segments.last(),
+                                    groupId = segments.dropLast(1).joinToString(".")
+                                )
+
+                                logger.info("📦 Found artifact: $artifact")
+                                runCatching { indexer.indexArtifact(artifact) }
+                            }
+                        }
                     }
                 }
             }

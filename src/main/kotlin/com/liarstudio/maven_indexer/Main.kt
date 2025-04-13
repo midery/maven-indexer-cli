@@ -38,7 +38,6 @@ fun main(args: Array<String>) {
     val artifactRepository = ArtifactRepository()
     val indexer = ArtifactIndexer(artifactRepository)
     val searcher = ArtifactSearcher(artifactRepository)
-
     runBlocking {
         when {
             index == true -> FullMavenArtifactCrawler().crawlAndIndex(indexer)

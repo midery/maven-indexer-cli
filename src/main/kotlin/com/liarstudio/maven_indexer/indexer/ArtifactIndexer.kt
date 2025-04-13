@@ -3,7 +3,6 @@ package com.liarstudio.maven_indexer.indexer
 import com.liarstudio.maven_indexer.indexer.data.ArtifactRepository
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.VersionMetadata
-import com.vdurmont.semver4j.Semver
 import java.net.URL
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.io.byteInputStream
@@ -50,6 +49,6 @@ class ArtifactIndexer(val artifactRepository: ArtifactRepository) {
 
 
     private fun findLatestVersion(latestFromMetadata: String?, allVersions: List<String>): String? {
-        return latestFromMetadata ?: return allVersions.maxBy { Semver(it) }
+        return latestFromMetadata ?: return allVersions.maxOrNull()
     }
 }

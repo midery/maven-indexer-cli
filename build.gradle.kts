@@ -16,7 +16,6 @@ dependencies {
     implementation("io.github.cdimascio:dotenv-kotlin:6.4.1")
     implementation("com.opencsv:opencsv:5.9")
     implementation("org.jsoup:jsoup:1.17.2")
-    implementation("com.vdurmont:semver4j:3.1.0")
     implementation("org.slf4j:slf4j-simple:2.0.17")
 }
 
