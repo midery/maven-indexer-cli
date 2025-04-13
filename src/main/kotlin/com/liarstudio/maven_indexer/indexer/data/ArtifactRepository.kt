@@ -97,7 +97,7 @@ class ArtifactRepository {
         }
     }
 
-    suspend fun getArtifacts(query: String, limit: Int = 50): List<IndexedArtifact> =
+    fun getArtifacts(query: String, limit: Int = 50): List<IndexedArtifact> =
         transaction {
             exec(
                 """
@@ -127,7 +127,12 @@ class ArtifactRepository {
                     )
                 }
                 results
-            } ?:  emptyList()
+            } ?: emptyList()
         }
 
+    fun getArtifactTargets(artifact: Artifact): List<String> = transaction {
+        ArtifactDao.select { (artifactId like "${artifact.artifactId}%") and (groupId eq artifact.groupId) }
+            .mapNotNull { it[artifactId].takeIf { id -> id != artifact.artifactId } }
+            .map { it.split('-').last() }
+    }
 }

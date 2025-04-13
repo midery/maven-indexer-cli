@@ -33,7 +33,7 @@ class FullMavenArtifactCrawler(
                 for (url in channel) {
                     if (!visited.add(url)) continue
                     logger.debug("Processing: $url")
-                    val html = runCatching { Jsoup.connect(url).get() }.getOrNull() ?: continue
+                    val html = Jsoup.connect(url).get()
                     logger.debug("Processing HTML...")
 
                     val links = html.select("a[href]")
