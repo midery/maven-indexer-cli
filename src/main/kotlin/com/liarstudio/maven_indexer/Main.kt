@@ -3,8 +3,11 @@ package com.liarstudio.maven_indexer
 import com.liarstudio.maven_indexer.crawler.ArtifactCrawler
 import com.liarstudio.maven_indexer.crawler.CsvArtifactCrawler
 import com.liarstudio.maven_indexer.crawler.FullMavenArtifactCrawler
+import com.liarstudio.maven_indexer.data.NetworkClient
 import com.liarstudio.maven_indexer.indexer.ArtifactIndexer
 import com.liarstudio.maven_indexer.indexer.data.ArtifactStorage
+import com.liarstudio.maven_indexer.parser.MavenMetadataParser
+import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
 import com.liarstudio.maven_indexer.parser.parseArtifact
 import kotlinx.cli.*
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +17,7 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 
 fun main(args: Array<String>) {
+//    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug")
     val parser = ArgParser("maven-indexer")
 
     val index by parser.option(
@@ -37,15 +41,21 @@ fun main(args: Array<String>) {
     )
 
     parser.parse(args)
+    val networkClient = NetworkClient()
     val artifactStorage = ArtifactStorage()
 
     artifactStorage.initialize()
 
-    val indexer = ArtifactIndexer(artifactStorage)
+    val indexer = ArtifactIndexer(MavenMetadataParser(networkClient), artifactStorage)
 
     runBlocking {
         when {
-            index == true -> processArtifactsIndexing(FullMavenArtifactCrawler(indexer = indexer))
+            index == true -> processArtifactsIndexing(
+                FullMavenArtifactCrawler(
+                    indexer = indexer,
+                    webPageLinkUrlParser = WebPageLinkUrlParser(networkClient)
+                )
+            )
 
             indexArtifact != null -> {
                 indexer.indexArtifact(parseArtifact(indexArtifact!!))
@@ -92,7 +102,7 @@ private suspend fun processArtifactsIndexing(crawler: ArtifactCrawler) {
             if (progress.total != null) {
                 print("\rProgress: ${progress.current}/${progress.total} artifacts")
             } else {
-                print("\rProgress: ${progress.current} artifacts")
+                print("\rProgress: ${progress.current} artifacts...")
             }
         }
     println()

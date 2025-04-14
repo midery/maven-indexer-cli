@@ -15,7 +15,9 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:0.45.0")
     implementation("io.github.cdimascio:dotenv-kotlin:6.4.1")
     implementation("com.opencsv:opencsv:5.9")
-    implementation("org.jsoup:jsoup:1.17.2")
+    implementation("io.ktor:ktor-client-core:2.3.5")
+    implementation("io.ktor:ktor-client-cio:2.3.5")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.5")
     implementation("org.slf4j:slf4j-simple:2.0.17")
 }
 

@@ -8,7 +8,7 @@ interface ArtifactCrawler {
 
     class Progress(val total: Int?, val current: Int) {
         companion object {
-            fun withoutTotal(current: Int) = Progress(null, 0)
+            fun withoutTotal(current: Int) = Progress(null, current)
         }
     }
 }
