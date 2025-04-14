@@ -1,8 +1,14 @@
 package com.liarstudio.maven_indexer.crawler
 
-import com.liarstudio.maven_indexer.indexer.ArtifactIndexer
+import kotlinx.coroutines.flow.Flow
 
 interface ArtifactCrawler {
 
-    suspend fun crawlAndIndex(indexer: ArtifactIndexer)
+    suspend fun crawlAndIndex(): Flow<Progress>
+
+    class Progress(val total: Int?, val current: Int) {
+        companion object {
+            fun withoutTotal(current: Int) = Progress(null, 0)
+        }
+    }
 }

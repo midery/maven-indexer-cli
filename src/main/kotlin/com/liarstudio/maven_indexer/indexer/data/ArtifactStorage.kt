@@ -5,22 +5,30 @@ import com.liarstudio.maven_indexer.indexer.data.ArtifactDao.groupId
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.IndexedArtifact
 import com.liarstudio.maven_indexer.models.VersionMetadata
+import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.exposed.sql.Column
-import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insertAndGetId
-import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
-class ArtifactRepository {
+class ArtifactStorage {
 
     val mutex = Mutex()
+
+    fun initialize() {
+        val dotenv = dotenv { ignoreIfMissing = true }
+        val dbPath = dotenv["DB_PATH"] ?: "maven.db"
+        Database.connect("jdbc:sqlite:$dbPath", driver = "org.sqlite.JDBC")
+        transaction { SchemaUtils.create(ArtifactDao, VersionDao) }
+    }
 
     suspend fun saveArtifact(artifact: Artifact, versionsMetadata: VersionMetadata) {
         mutex.withLock {

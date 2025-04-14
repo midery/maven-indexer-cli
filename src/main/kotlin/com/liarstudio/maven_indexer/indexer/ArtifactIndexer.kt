@@ -1,13 +1,13 @@
 package com.liarstudio.maven_indexer.indexer
 
-import com.liarstudio.maven_indexer.indexer.data.ArtifactRepository
+import com.liarstudio.maven_indexer.indexer.data.ArtifactStorage
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.VersionMetadata
 import java.net.URL
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.io.byteInputStream
 
-class ArtifactIndexer(val artifactRepository: ArtifactRepository) {
+class ArtifactIndexer(val artifactStorage: ArtifactStorage) {
 
     suspend fun indexArtifact(artifact: Artifact) {
         val groupPath = artifact.groupId.replace('.', '/')
@@ -37,7 +37,7 @@ class ArtifactIndexer(val artifactRepository: ArtifactRepository) {
             )
 
 
-        artifactRepository.saveArtifact(
+        artifactStorage.saveArtifact(
             artifact = artifact,
             versionsMetadata = VersionMetadata(
                 latestVersion = latestVersion,
