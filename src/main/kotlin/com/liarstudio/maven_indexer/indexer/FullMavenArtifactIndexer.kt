@@ -5,6 +5,7 @@ import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.delay
@@ -39,16 +40,16 @@ class FullMavenArtifactIndexer(
 
 
         urlHandleChannel.send(startUrl)
-        progressChannel.send(Progress.Companion.withoutTotal(0))
+        progressChannel.send(Progress.Simple(current = 0))
 
-        val waiterJob = launch { waitForCompletion(activeTasks, urlHandleChannel, progressChannel, visited) }
+        val waiterJob = launch { waitForCompletion(activeTasks, urlHandleChannel, visited) }
 
         val indexingJobs = List(PARALLELISM) {
             launch(Dispatchers.IO) {
                 for (url in urlHandleChannel) {
                     try {
                         if (!visited.add(url)) continue
-                        processUrl(url, activeTasks, urlHandleChannel)
+                        processUrl(url, activeTasks, urlHandleChannel, progressChannel)
                     } finally {
                         activeTasks.decrementAndGet()
                         logger.debug("Finished processing $url. Active tasks remaining: ${activeTasks.get()}")
@@ -64,7 +65,8 @@ class FullMavenArtifactIndexer(
     private suspend fun CoroutineScope.processUrl(
         url: String,
         activeTasks: AtomicInteger,
-        urlHandleChannel: SendChannel<String>
+        urlHandleChannel: SendChannel<String>,
+        progressChannel: SendChannel<Progress>
     ) {
         logger.debug("Processing: $url")
         activeTasks.incrementAndGet()
@@ -73,7 +75,7 @@ class FullMavenArtifactIndexer(
 
         val artifactMetadata = links.find { link -> link.endsWith(suffix = MAVEN_METADATA_FILE) }
         if (artifactMetadata != null) {
-            val artifact = processArtifactMetadata(url)
+            val artifact = processArtifactMetadata(url, progressChannel)
             logger.debug("Artifact processing completed: $artifact")
         } else {
             for (link in links) {
@@ -81,15 +83,16 @@ class FullMavenArtifactIndexer(
                 val fullUrl = url + link
                 if (link.endsWith("/")) {
                     logger.debug("Adding link to the queue: $link")
-                    if (processedArtifactsCount < 1) {
-                        urlHandleChannel.trySend(fullUrl)
-                    }
+                    urlHandleChannel.trySend(fullUrl)
                 }
             }
         }
     }
 
-    private suspend fun CoroutineScope.processArtifactMetadata(url: String): Artifact? {
+    private suspend fun CoroutineScope.processArtifactMetadata(
+        url: String,
+        progressChannel: SendChannel<Progress>
+    ): Artifact? {
         val path = url.removePrefix(startUrl).trim('/')
         val segments = path.split('/')
 
@@ -102,17 +105,17 @@ class FullMavenArtifactIndexer(
             logger.debug("📦 Found artifact: $artifact")
             runCatching { indexer.indexArtifact(artifact) }
             synchronized(this) {
-                processedArtifactsCount++
+                progressChannel.trySend(Progress.Simple(current = processedArtifactsCount++))
             }
             return artifact
         }
         return null
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun waitForCompletion(
         activeTasks: AtomicInteger,
         urlHandleChannel: Channel<String>,
-        progressChannel: SendChannel<Progress>,
         visited: Set<String>
     ) {
         while (true) {
@@ -122,7 +125,6 @@ class FullMavenArtifactIndexer(
                 logger.info("🔄 Done processing tasks for $MAVEN_CENTRAL_REPO_URL!")
                 break
             } else {
-                progressChannel.trySend(Progress.withoutTotal(processedArtifactsCount))
                 logger.info("🔄 ActiveTasks: ${activeTasks.get()}, visited: ${visited.size}")
             }
         }

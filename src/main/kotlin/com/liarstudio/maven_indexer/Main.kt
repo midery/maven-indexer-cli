@@ -6,17 +6,21 @@ import com.liarstudio.maven_indexer.indexer.FullMavenArtifactIndexer
 import com.liarstudio.maven_indexer.data.network.NetworkClient
 import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
-import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpVariantsExtractor
+import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor
 import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
 import com.liarstudio.maven_indexer.parser.parseArtifact
+import com.liarstudio.maven_indexer.printer.ProgressRenderer
 import kotlinx.cli.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>) {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
@@ -37,8 +41,14 @@ fun main(args: Array<String>) {
         shortName = "t",
         description = "Find single artifact's available Kotlin Multiplatform Targets. Input format: group:artifactId"
     )
+    val versions by parser.option(
+        ArgType.String,
+        shortName = "v",
+        description = "Find single artifact's available Versions. Input format: group:artifactId"
+    )
 
     parser.parse(args)
+    val progressRenderer = ProgressRenderer()
     val networkClient = NetworkClient()
     val artifactStorage = ArtifactStorage()
 
@@ -49,9 +59,10 @@ fun main(args: Array<String>) {
     runBlocking {
         when {
             index == true -> processArtifactsIndexing(
-                FullMavenArtifactIndexer(
+                indexer = FullMavenArtifactIndexer(
                     indexer = indexer, webPageLinkUrlParser = WebPageLinkUrlParser(networkClient)
-                )
+                ),
+                progressRenderer = progressRenderer
             )
 
             indexArtifact != null -> {
@@ -59,16 +70,18 @@ fun main(args: Array<String>) {
             }
 
             indexFromCsv != null -> processArtifactsIndexing(
-                CsvArtifactIndexer(
+                indexer = CsvArtifactIndexer(
                     csvFile = File(indexFromCsv!!),
                     indexer = indexer,
                     csvParser = CsvArtifactsParser(),
-                    kmpVariantsExtractor = ArtifactKmpVariantsExtractor(WebPageLinkUrlParser(networkClient)),
-                )
+                    kmpVariantsExtractor = ArtifactKmpTargetsExtractor(WebPageLinkUrlParser(networkClient)),
+                ),
+                progressRenderer = progressRenderer
             )
 
             search != null -> processArtifactSearch(search!!, artifactStorage)
             targets != null -> processAvailableTargets(targets!!, artifactStorage)
+            versions != null -> processAvailableVersions(versions!!, artifactStorage)
             else -> println("Use --help to see options.")
         }
     }
@@ -89,22 +102,44 @@ private fun processAvailableTargets(
         println("No targets found")
         return
     } else {
-        println("Kotlin Multiplatform Targets for $artifactInfo: ")
-        targets.sorted().forEach(::println)
+        println("All Kotlin Multiplatform Targets for '$artifactInfo': ")
+        targets
+            .sorted()
+            .forEach { println("* $it") }
     }
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
-private suspend fun processArtifactsIndexing(indexer: MultipleArtifactIndexer) {
-    println("Start artifacts indexing...")
-    indexer.index().flowOn(Dispatchers.IO).collect { progress ->
-        if (progress.total != null) {
-            print("\rProgress: ${progress.current}/${progress.total} artifacts")
-        } else {
-            print("\rProgress: ${progress.current} artifacts...")
-        }
+private fun processAvailableVersions(
+    artifactInfo: String, artifactStorage: ArtifactStorage
+) {
+    val versionsMeta = artifactStorage.getArtifactVersions(artifact = parseArtifact(artifactInfo))
+    if (versionsMeta.versions.isEmpty()) {
+        println("No versions found")
+        return
+    } else {
+        println("All Versions for '$artifactInfo': ")
+        versionsMeta.versions.sortedDescending()
+            .forEach { version ->
+                val versionSuffix = when (version) {
+                    versionsMeta.latestVersion -> "(latest)"
+                    versionsMeta.releaseVersion -> "(release)"
+                    else -> ""
+                }
+                println("* $version $versionSuffix")
+            }
     }
+
+}
+
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+private suspend fun processArtifactsIndexing(indexer: MultipleArtifactIndexer, progressRenderer: ProgressRenderer) {
+    println("Start artifacts indexing...")
+    indexer.index()
+        .flowOn(Dispatchers.IO)
+        .sample(1.seconds)
+        .collect { progress ->
+            progressRenderer.render(progress)
+        }
     println()
     println("✅ Done indexing all artifacts!")
-    println()
 }

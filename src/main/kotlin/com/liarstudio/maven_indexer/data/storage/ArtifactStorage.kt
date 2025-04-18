@@ -1,10 +1,8 @@
 package com.liarstudio.maven_indexer.data.storage
 
-import com.liarstudio.maven_indexer.data.storage.ArtifactDao.artifactId
-import com.liarstudio.maven_indexer.data.storage.ArtifactDao.groupId
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.IndexedArtifact
-import com.liarstudio.maven_indexer.models.ArtifactMetadata
+import com.liarstudio.maven_indexer.models.ArtifactVersionMetadata
 import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -39,7 +37,7 @@ class ArtifactStorage {
         }
     }
 
-    suspend fun saveArtifact(artifact: Artifact, versionsMetadata: ArtifactMetadata) {
+    suspend fun saveArtifact(artifact: Artifact, versionsMetadata: ArtifactVersionMetadata) {
         mutex.withLock {
             transaction {
                 val artifactDatabaseId = updateArtifact(artifact)
@@ -82,7 +80,7 @@ class ArtifactStorage {
 
     private fun updateArtifact(artifact: Artifact): Long {
         val dbArtifact =
-            ArtifactDao.select(groupId.eq(artifact.groupId) and artifactId.eq(artifact.artifactId))
+            ArtifactDao.select(ArtifactDao.groupId.eq(artifact.groupId) and ArtifactDao.artifactId.eq(artifact.artifactId))
                 .firstOrNull()
 
         return if (dbArtifact == null) {
@@ -99,7 +97,7 @@ class ArtifactStorage {
 
     private fun updateVersions(
         artifactDatabaseId: Long,
-        versionsMetadata: ArtifactMetadata,
+        versionsMetadata: ArtifactVersionMetadata,
     ) {
         val existingVersions = VersionDao
             .select { VersionDao.artifact eq artifactDatabaseId }
@@ -169,9 +167,36 @@ class ArtifactStorage {
             }
         } ?: emptyList()
 
-    fun getArtifactTargets(artifact: Artifact): List<String> = transaction {
-        ArtifactDao.select { (artifactId like "${artifact.artifactId}%") and (groupId eq artifact.groupId) }
-            .mapNotNull { it[artifactId].takeIf { id -> id != artifact.artifactId } }
-            .map { it.split('-').last() }
+    fun getArtifactTargets(artifact: Artifact): List<Artifact> = transaction {
+        ArtifactDao.select { (ArtifactDao.artifactId like "${artifact.artifactId}%") and (ArtifactDao.groupId eq artifact.groupId) }
+            .mapNotNull {
+                val groupId = it[ArtifactDao.groupId]
+                val artifactId = it[ArtifactDao.artifactId]
+                if (artifactId != artifact.artifactId) {
+                    Artifact(groupId, artifactId)
+                } else {
+                    null
+                }
+            }
+    }
+
+    fun getArtifactVersions(artifact: Artifact): ArtifactVersionMetadata = transaction {
+        var releaseVersion: String? = null
+        var latestVersion: String? = null
+        val versions = (ArtifactDao innerJoin VersionDao)
+            .select {
+                (ArtifactDao.artifactId eq artifact.artifactId) and (ArtifactDao.groupId eq artifact.groupId)
+            }
+            .map {
+                val version = it[VersionDao.version]
+                if (it[VersionDao.isLatest]) {
+                    latestVersion = version
+                }
+                if (it[VersionDao.isRelease]) {
+                    releaseVersion = version
+                }
+                version
+            }
+        ArtifactVersionMetadata(versions, latestVersion, releaseVersion)
     }
 }

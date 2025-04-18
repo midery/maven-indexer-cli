@@ -6,9 +6,11 @@ interface MultipleArtifactIndexer {
 
     suspend fun index(): Flow<Progress>
 
-    class Progress(val total: Int?, val current: Int) {
-        companion object {
-            fun withoutTotal(current: Int) = Progress(null, current)
-        }
+    sealed class Progress(val current: Int, val total: Int?) {
+
+        class Staged(val stageDescription: String, current: Int, total: Int?, val stageProgress: Simple) :
+            Progress(current, total)
+
+        class Simple(current: Int, total: Int? = null) : Progress(current, total)
     }
 }
