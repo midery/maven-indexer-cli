@@ -6,11 +6,12 @@ interface MultipleArtifactIndexer {
 
     suspend fun index(): Flow<Progress>
 
-    sealed class Progress(val current: Int, val total: Int?) {
+    sealed class Progress() {
 
-        class Staged(val stageDescription: String, current: Int, total: Int?, val stageProgress: Simple) :
-            Progress(current, total)
+        class Staged(val stageDescription: String, val current: Int, val total: Int?, val stageProgress: Simple) :
+            Progress()
 
-        class Simple(current: Int, total: Int? = null) : Progress(current, total)
+        class Simple(val current: Int, val total: Int? = null) : Progress()
+        class Result(val successCount: Int, val errorCount: Int) : Progress()
     }
 }

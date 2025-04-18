@@ -1,5 +1,6 @@
 package com.liarstudio.maven_indexer.indexer
 
+import com.liarstudio.maven_indexer.MAVEN_CENTRAL_REPO_URL
 import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer.Progress
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
@@ -22,23 +23,23 @@ import java.util.concurrent.atomic.AtomicInteger
  * TODO: Error handling
  */
 class FullMavenArtifactIndexer(
-    private val startUrl: String = MAVEN_CENTRAL_REPO_URL,
+    private val host: String = MAVEN_CENTRAL_REPO_URL,
+    private val additionalPath: String = "",
     private val indexer: SingleArtifactIndexer,
     private val webPageLinkUrlParser: WebPageLinkUrlParser,
 ) : MultipleArtifactIndexer {
 
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
-    @Volatile
-    private var processedArtifactsCount = 0
-
     override suspend fun index(): Flow<Progress> = channelFlow {
         val urlHandleChannel = Channel<String>(capacity = Channel.UNLIMITED)
         val progressChannel = channel
         val visited = ConcurrentHashMap.newKeySet<String>()
         val activeTasks = AtomicInteger(0)
+        val progressArtifactCount = AtomicInteger(0)
+        val errorsCount = AtomicInteger(0)
 
-
+        val startUrl = host + additionalPath
         urlHandleChannel.send(startUrl)
         progressChannel.send(Progress.Simple(current = 0))
 
@@ -49,7 +50,14 @@ class FullMavenArtifactIndexer(
                 for (url in urlHandleChannel) {
                     try {
                         if (!visited.add(url)) continue
-                        processUrl(url, activeTasks, urlHandleChannel, progressChannel)
+                        processUrl(
+                            url = url,
+                            activeTasks = activeTasks,
+                            progressArtifactCount = progressArtifactCount,
+                            errorsCount = errorsCount,
+                            progressChannel = progressChannel,
+                            urlHandleChannel = urlHandleChannel
+                        )
                     } finally {
                         activeTasks.decrementAndGet()
                         logger.debug("Finished processing $url. Active tasks remaining: ${activeTasks.get()}")
@@ -60,22 +68,37 @@ class FullMavenArtifactIndexer(
 
         indexingJobs.joinAll()
         waiterJob.join()
+        progressChannel.send(Progress.Result(progressArtifactCount.get(), errorsCount.get()))
     }
 
     private suspend fun CoroutineScope.processUrl(
         url: String,
         activeTasks: AtomicInteger,
+        progressArtifactCount: AtomicInteger,
+        errorsCount: AtomicInteger,
+        progressChannel: SendChannel<Progress>,
         urlHandleChannel: SendChannel<String>,
-        progressChannel: SendChannel<Progress>
     ) {
         logger.debug("Processing: $url")
         activeTasks.incrementAndGet()
-        val links = webPageLinkUrlParser.parse(url)
+        val links = runCatching {
+            webPageLinkUrlParser.parse(url)
+        }
+            .getOrElse {
+                errorsCount.incrementAndGet()
+                return
+            }
+
         logger.debug("Found links: ${links.size}")
 
         val artifactMetadata = links.find { link -> link.endsWith(suffix = MAVEN_METADATA_FILE) }
         if (artifactMetadata != null) {
-            val artifact = processArtifactMetadata(url, progressChannel)
+            val artifact = processArtifactMetadata(
+                url = url,
+                progressArtifactCount = progressArtifactCount,
+                errorsCount = errorsCount,
+                progressChannel = progressChannel
+            )
             logger.debug("Artifact processing completed: $artifact")
         } else {
             for (link in links) {
@@ -91,11 +114,14 @@ class FullMavenArtifactIndexer(
 
     private suspend fun CoroutineScope.processArtifactMetadata(
         url: String,
+        progressArtifactCount: AtomicInteger,
+        errorsCount: AtomicInteger,
         progressChannel: SendChannel<Progress>
     ): Artifact? {
-        val path = url.removePrefix(startUrl).trim('/')
+        val path = url.removePrefix(host).trim('/')
         val segments = path.split('/')
 
+        logger.debug("Processing $path. $segments")
         if (segments.size >= 2) {
             val artifact = Artifact(
                 artifactId = segments.last(),
@@ -103,10 +129,12 @@ class FullMavenArtifactIndexer(
             )
 
             logger.debug("📦 Found artifact: $artifact")
-            runCatching { indexer.indexArtifact(artifact) }
-            synchronized(this) {
-                progressChannel.trySend(Progress.Simple(current = processedArtifactsCount++))
-            }
+            indexer.indexArtifact(artifact)
+                .fold(
+                    onSuccess = { progressArtifactCount.incrementAndGet() },
+                    onFailure = { errorsCount.incrementAndGet() }
+                )
+            progressChannel.trySend(Progress.Simple(current = progressArtifactCount.get()))
             return artifact
         }
         return null
@@ -116,13 +144,13 @@ class FullMavenArtifactIndexer(
     private suspend fun waitForCompletion(
         activeTasks: AtomicInteger,
         urlHandleChannel: Channel<String>,
-        visited: Set<String>
+        visited: Set<String>,
     ) {
         while (true) {
             delay(1000)
             if (activeTasks.get() == 0 && urlHandleChannel.isEmpty) {
                 urlHandleChannel.close()
-                logger.info("🔄 Done processing tasks for $MAVEN_CENTRAL_REPO_URL!")
+                logger.info("✅ Done processing tasks for $host!")
                 break
             } else {
                 logger.info("🔄 ActiveTasks: ${activeTasks.get()}, visited: ${visited.size}")
@@ -132,7 +160,6 @@ class FullMavenArtifactIndexer(
     }
 
     companion object {
-        const val MAVEN_CENTRAL_REPO_URL = "https://repo1.maven.org/maven2/"
         const val PARALLELISM = 256
         const val MAVEN_METADATA_FILE = "maven-metadata.xml"
     }

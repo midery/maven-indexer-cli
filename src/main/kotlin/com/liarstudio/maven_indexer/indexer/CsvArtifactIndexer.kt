@@ -7,9 +7,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
@@ -28,6 +26,7 @@ class CsvArtifactIndexer(
         val csvArtifacts = csvParser.parse(csvFile)
         var artifactsSize = csvArtifacts.size
         val processedArtifactsCount = AtomicInteger(0)
+        val processingErrors = AtomicInteger(0)
 
         channel.send(extractKmpTargetsStageProgress(0, artifactsSize))
         val kmmArtifactVariants = csvArtifacts
@@ -55,12 +54,23 @@ class CsvArtifactIndexer(
         kmmArtifactVariants.map {
             async {
                 semaphore.withPermit {
-                    val indexResult = indexer.indexArtifact(it)
-                    channel.send(fetchVersionsStageProgress(processedArtifactsCount.incrementAndGet(), artifactsSize))
+                    indexer.indexArtifact(it)
+                        .fold(
+                            onSuccess = { processedArtifactsCount.incrementAndGet() },
+                            onFailure = { processingErrors.incrementAndGet() }
+                        )
+                    channel.send(fetchVersionsStageProgress(processedArtifactsCount.get(), artifactsSize))
                 }
             }
         }
             .awaitAll()
+
+        channel.send(
+            Progress.Result(
+                successCount = processedArtifactsCount.get(),
+                errorCount = processingErrors.get()
+            )
+        )
     }
 
     companion object {

@@ -17,10 +17,14 @@ import kotlinx.cli.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>) {
@@ -36,7 +40,13 @@ fun main(args: Array<String>) {
     val indexArtifact by parser.option(
         ArgType.String, shortName = "ia", description = "Index single artifact. Input format: group:artifactId"
     )
-    val indexFromCsv by parser.option(ArgType.String, shortName = "icsv", description = "Index from CSV file")
+    val indexFromCsv by parser.option(
+        ArgType.String,
+        shortName = "icsv",
+        description = "Index from CSV file. CSV should be specified in input format with two columns: 'namespace' for artifact's groupId and 'name' for artifactId. \n" +
+                "This program will try to index all the artifacts from the CSV file, as well as their KMP targets.\nFor example, if you add a row with 'ktor-network' library, " +
+                "it will index all the possible kmp targets: \n* ktor-network-js, \n* ktor-network-jvm, \n* ktor-network-iosx64, etc."
+    )
     val targets by parser.option(
         ArgType.String,
         shortName = "t",
@@ -139,10 +149,16 @@ private suspend fun processArtifactsIndexing(indexer: MultipleArtifactIndexer, p
     println("Start artifacts indexing...")
     indexer.index()
         .flowOn(Dispatchers.IO)
-        .sample(1.seconds)
+        .throttleLatest(1.seconds)
         .collect { progress ->
             progressRenderer.render(progress)
         }
-    println()
-    println("✅ Done indexing all artifacts!")
+
 }
+
+fun <T> Flow<T>.throttleLatest(duration: Duration): Flow<T> = this
+    .conflate()
+    .transform {
+        emit(it)
+        delay(duration)
+    }

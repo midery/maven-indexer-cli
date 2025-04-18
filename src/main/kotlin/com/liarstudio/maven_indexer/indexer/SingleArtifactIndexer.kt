@@ -2,24 +2,22 @@ package com.liarstudio.maven_indexer.indexer
 
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.models.Artifact
+import com.liarstudio.maven_indexer.models.ArtifactVersionMetadata
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 
 class SingleArtifactIndexer(
-    val mavenMetadataParser: MavenMetadataParser,
-    val artifactStorage: ArtifactStorage
+    private val mavenMetadataParser: MavenMetadataParser,
+    private val artifactStorage: ArtifactStorage,
 ) {
 
-    suspend fun indexArtifact(artifact: Artifact) {
-        val groupPath = artifact.groupId.replace('.', '/')
-        val artId = artifact.artifactId
-        val versionMeta =
-            mavenMetadataParser.parse("https://repo1.maven.org/maven2/$groupPath/$artId/maven-metadata.xml")
-
-        versionMeta ?: return
+    suspend fun indexArtifact(artifact: Artifact): Result<ArtifactVersionMetadata> = runCatching {
+        val versionMeta = mavenMetadataParser.parse(artifact)
 
         artifactStorage.saveArtifact(
             artifact = artifact,
             versionsMetadata = versionMeta
         )
+
+        versionMeta
     }
 }

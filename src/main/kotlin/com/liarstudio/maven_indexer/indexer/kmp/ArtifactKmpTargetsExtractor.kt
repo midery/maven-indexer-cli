@@ -1,22 +1,25 @@
 package com.liarstudio.maven_indexer.indexer.kmp
 
+import com.liarstudio.maven_indexer.MAVEN_CENTRAL_REPO_URL
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
+import com.liarstudio.maven_indexer.parser.groupIdUrlPath
 
 class ArtifactKmpTargetsExtractor(
     private val webPageLinkUrlParser: WebPageLinkUrlParser,
+    private val host: String = MAVEN_CENTRAL_REPO_URL,
 ) {
 
     suspend fun getKmpVariants(artifact: Artifact): List<Artifact> {
-        return webPageLinkUrlParser.parse(
-            "https://repo1.maven.org/maven2/${artifact.groupId.replace('.', '/')}",
-        )
+        return webPageLinkUrlParser.parse(artifact.getArtifactGroupUrl())
             .asSequence()
             .map { it.trim('/') }
             .filter { it.isKmpVariationOf(artifact) }
             .map { link -> Artifact(artifact.groupId, link) }
             .toList()
     }
+
+    private fun Artifact.getArtifactGroupUrl() = "$host$groupIdUrlPath"
 
     companion object {
 

@@ -12,6 +12,7 @@ class ProgressRenderer {
         when (this) {
             is Progress.Simple -> this.getRenderableMessage()
             is Progress.Staged -> this.getRenderableMessage()
+            is Progress.Result -> this.getRenderableMessage()
         }
 
     private fun Progress.Simple.getRenderableMessage(): String =
@@ -27,4 +28,10 @@ class ProgressRenderer {
         } else {
             "Stage $current: $stageDescription. ${stageProgress.getRenderableMessage()} "
         }
+
+    private fun Progress.Result.getRenderableMessage(): String =
+        "✅ Done indexing all artifacts!\n Statistics: " +
+                "\n* Successfully indexed artifacts: $successCount" +
+                "\n* Errors: $errorCount" +
+                "\n* Total number of artifacts processed: ${successCount + errorCount}"
 }
