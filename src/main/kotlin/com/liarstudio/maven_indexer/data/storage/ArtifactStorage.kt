@@ -4,7 +4,7 @@ import com.liarstudio.maven_indexer.data.storage.ArtifactDao.artifactId
 import com.liarstudio.maven_indexer.data.storage.ArtifactDao.groupId
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.IndexedArtifact
-import com.liarstudio.maven_indexer.models.VersionMetadata
+import com.liarstudio.maven_indexer.models.ArtifactMetadata
 import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,13 +33,13 @@ class ArtifactStorage {
             exec(
                 """
                         CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fuzzy_index
-                        USING fts5(group_id, artifact_id, content='', columnsize=1);
+                        USING fts5(group_id, artifact_id, tokenize="trigram");
                 """
             )
         }
     }
 
-    suspend fun saveArtifact(artifact: Artifact, versionsMetadata: VersionMetadata) {
+    suspend fun saveArtifact(artifact: Artifact, versionsMetadata: ArtifactMetadata) {
         mutex.withLock {
             transaction {
                 val artifactDatabaseId = updateArtifact(artifact)
@@ -53,8 +53,6 @@ class ArtifactStorage {
     }
 
     private fun Transaction.updateArtifactTrigrams(artifact: Artifact, artifactDatabaseId: Long) {
-        val trigramGroup = generateTrigramString(artifact.groupId)
-        val trigramArtifact = generateTrigramString(artifact.artifactId)
         val fuzzyIndexAlreadyExists = exec(
             """
             SELECT 1 FROM artifacts_fuzzy_index WHERE rowid = $artifactDatabaseId
@@ -65,7 +63,7 @@ class ArtifactStorage {
             exec(
                 """
         INSERT INTO artifacts_fuzzy_index(rowid, group_id, artifact_id)
-        VALUES ($artifactDatabaseId, '$trigramGroup', '$trigramArtifact')
+        VALUES ($artifactDatabaseId, '${artifact.groupId}', '${artifact.artifactId}')
     """
             )
         }
@@ -101,7 +99,7 @@ class ArtifactStorage {
 
     private fun updateVersions(
         artifactDatabaseId: Long,
-        versionsMetadata: VersionMetadata,
+        versionsMetadata: ArtifactMetadata,
     ) {
         val existingVersions = VersionDao
             .select { VersionDao.artifact eq artifactDatabaseId }
@@ -149,13 +147,13 @@ class ArtifactStorage {
             val trigrams = generateTrigramString(query, " OR ")
             exec(
                 """
-        SELECT a.group_id, a.artifact_id, v.version, bm25(artifacts_fuzzy_index) as score
+        SELECT a.group_id, a.artifact_id, v.version
         FROM artifacts_fuzzy_index f
         JOIN artifacts a ON a.id = f.rowid
         JOIN versions v ON a.id = v.artifact
         WHERE artifacts_fuzzy_index MATCH '$trigrams'
           AND v.is_latest = 1
-        ORDER by score ASC
+        ORDER by rank ASC
         LIMIT $limit
     """.trimIndent(),
             ) {

@@ -6,6 +6,7 @@ import com.liarstudio.maven_indexer.indexer.FullMavenArtifactIndexer
 import com.liarstudio.maven_indexer.data.network.NetworkClient
 import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
+import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
 import com.liarstudio.maven_indexer.parser.parseArtifact
@@ -21,14 +22,10 @@ fun main(args: Array<String>) {
     val parser = ArgParser("maven-indexer")
 
     val index by parser.option(
-        ArgType.Boolean,
-        shortName = "i",
-        description = "Index all dependencies from Maven Central"
+        ArgType.Boolean, shortName = "i", description = "Index all dependencies from Maven Central"
     )
     val search by parser.option(
-        ArgType.String,
-        shortName = "s",
-        description = "Search artifact by name (group or artifactId)"
+        ArgType.String, shortName = "s", description = "Search artifact by name (group or artifactId)"
     )
     val indexArtifact by parser.option(
         ArgType.String, shortName = "ia", description = "Index single artifact. Input format: group:artifactId"
@@ -52,8 +49,7 @@ fun main(args: Array<String>) {
         when {
             index == true -> processArtifactsIndexing(
                 FullMavenArtifactIndexer(
-                    indexer = indexer,
-                    webPageLinkUrlParser = WebPageLinkUrlParser(networkClient)
+                    indexer = indexer, webPageLinkUrlParser = WebPageLinkUrlParser(networkClient)
                 )
             )
 
@@ -62,7 +58,7 @@ fun main(args: Array<String>) {
             }
 
             indexFromCsv != null -> processArtifactsIndexing(
-                CsvArtifactIndexer(File(indexFromCsv!!), indexer)
+                CsvArtifactIndexer(File(indexFromCsv!!), indexer, CsvArtifactsParser())
             )
 
             search != null -> processArtifactSearch(search!!, artifactStorage)
@@ -80,8 +76,7 @@ private fun processArtifactSearch(query: String, artifactStorage: ArtifactStorag
 }
 
 private fun processAvailableTargets(
-    artifactInfo: String,
-    artifactStorage: ArtifactStorage
+    artifactInfo: String, artifactStorage: ArtifactStorage
 ) {
     val targets = artifactStorage.getArtifactTargets(artifact = parseArtifact(artifactInfo))
     if (targets.isEmpty()) {
@@ -96,15 +91,13 @@ private fun processAvailableTargets(
 @OptIn(ExperimentalCoroutinesApi::class)
 private suspend fun processArtifactsIndexing(indexer: MultipleArtifactIndexer) {
     println("Start artifacts indexing...")
-    indexer.index()
-        .flowOn(Dispatchers.IO)
-        .collect { progress ->
-            if (progress.total != null) {
-                print("\rProgress: ${progress.current}/${progress.total} artifacts")
-            } else {
-                print("\rProgress: ${progress.current} artifacts...")
-            }
+    indexer.index().flowOn(Dispatchers.IO).collect { progress ->
+        if (progress.total != null) {
+            print("\rProgress: ${progress.current}/${progress.total} artifacts")
+        } else {
+            print("\rProgress: ${progress.current} artifacts...")
         }
+    }
     println()
     println("✅ Done indexing all artifacts!")
     println()

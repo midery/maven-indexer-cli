@@ -11,8 +11,8 @@ import io.ktor.client.statement.bodyAsText
 class NetworkClient {
 
     private val client = HttpClient(CIO) {
-        HttpClientConfig.install(ContentNegotiation.Plugin)
-        HttpClientConfig.install(HttpRequestRetry.Plugin)
+        install(ContentNegotiation.Plugin)
+        install(HttpRequestRetry.Plugin)
         expectSuccess = false
     }
 

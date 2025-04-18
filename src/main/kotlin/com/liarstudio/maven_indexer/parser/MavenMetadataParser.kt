@@ -1,12 +1,12 @@
 package com.liarstudio.maven_indexer.parser
 
 import com.liarstudio.maven_indexer.data.network.NetworkClient
-import com.liarstudio.maven_indexer.models.VersionMetadata
+import com.liarstudio.maven_indexer.models.ArtifactMetadata
 import javax.xml.parsers.DocumentBuilderFactory
 
 class MavenMetadataParser(private val networkClient: NetworkClient) {
 
-    suspend fun parse(metadataUrl: String): VersionMetadata? {
+    suspend fun parse(metadataUrl: String): ArtifactMetadata? {
         try {
             val xml = networkClient.getBody(metadataUrl)
             val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
@@ -26,7 +26,7 @@ class MavenMetadataParser(private val networkClient: NetworkClient) {
                     versions
                 )
 
-            return VersionMetadata(versions, latestVersion, releaseVersion)
+            return ArtifactMetadata(versions, latestVersion, releaseVersion)
         } catch (e: Exception) {
             println("❌ Failed to fetch metadata for $metadataUrl")
             return null
