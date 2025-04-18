@@ -6,6 +6,7 @@ import com.liarstudio.maven_indexer.indexer.FullMavenArtifactIndexer
 import com.liarstudio.maven_indexer.data.network.NetworkClient
 import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
+import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpVariantsExtractor
 import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
@@ -58,7 +59,12 @@ fun main(args: Array<String>) {
             }
 
             indexFromCsv != null -> processArtifactsIndexing(
-                CsvArtifactIndexer(File(indexFromCsv!!), indexer, CsvArtifactsParser())
+                CsvArtifactIndexer(
+                    csvFile = File(indexFromCsv!!),
+                    indexer = indexer,
+                    csvParser = CsvArtifactsParser(),
+                    kmpVariantsExtractor = ArtifactKmpVariantsExtractor(WebPageLinkUrlParser(networkClient)),
+                )
             )
 
             search != null -> processArtifactSearch(search!!, artifactStorage)
