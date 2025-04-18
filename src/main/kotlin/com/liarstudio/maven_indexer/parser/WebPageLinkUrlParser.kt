@@ -1,6 +1,6 @@
 package com.liarstudio.maven_indexer.parser
 
-import com.liarstudio.maven_indexer.data.NetworkClient
+import com.liarstudio.maven_indexer.data.network.NetworkClient
 
 class WebPageLinkUrlParser(val networkClient: NetworkClient) {
 

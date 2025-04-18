@@ -1,7 +1,7 @@
-package com.liarstudio.maven_indexer.indexer.data
+package com.liarstudio.maven_indexer.data.storage
 
-import com.liarstudio.maven_indexer.indexer.data.ArtifactDao.artifactId
-import com.liarstudio.maven_indexer.indexer.data.ArtifactDao.groupId
+import com.liarstudio.maven_indexer.data.storage.ArtifactDao.artifactId
+import com.liarstudio.maven_indexer.data.storage.ArtifactDao.groupId
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.IndexedArtifact
 import com.liarstudio.maven_indexer.models.VersionMetadata

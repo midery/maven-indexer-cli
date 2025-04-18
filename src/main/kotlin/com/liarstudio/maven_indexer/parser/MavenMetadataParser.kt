@@ -1,6 +1,6 @@
 package com.liarstudio.maven_indexer.parser
 
-import com.liarstudio.maven_indexer.data.NetworkClient
+import com.liarstudio.maven_indexer.data.network.NetworkClient
 import com.liarstudio.maven_indexer.models.VersionMetadata
 import javax.xml.parsers.DocumentBuilderFactory
 

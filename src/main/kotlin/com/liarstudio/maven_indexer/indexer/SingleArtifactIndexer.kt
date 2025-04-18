@@ -1,10 +1,10 @@
 package com.liarstudio.maven_indexer.indexer
 
-import com.liarstudio.maven_indexer.indexer.data.ArtifactStorage
+import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 
-class ArtifactIndexer(
+class SingleArtifactIndexer(
     val mavenMetadataParser: MavenMetadataParser,
     val artifactStorage: ArtifactStorage
 ) {

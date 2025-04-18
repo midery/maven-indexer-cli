@@ -1,11 +1,11 @@
 package com.liarstudio.maven_indexer
 
-import com.liarstudio.maven_indexer.crawler.ArtifactCrawler
-import com.liarstudio.maven_indexer.crawler.CsvArtifactCrawler
-import com.liarstudio.maven_indexer.crawler.FullMavenArtifactCrawler
-import com.liarstudio.maven_indexer.data.NetworkClient
-import com.liarstudio.maven_indexer.indexer.ArtifactIndexer
-import com.liarstudio.maven_indexer.indexer.data.ArtifactStorage
+import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer
+import com.liarstudio.maven_indexer.indexer.CsvArtifactIndexer
+import com.liarstudio.maven_indexer.indexer.FullMavenArtifactIndexer
+import com.liarstudio.maven_indexer.data.network.NetworkClient
+import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
+import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
 import com.liarstudio.maven_indexer.parser.parseArtifact
@@ -17,7 +17,7 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 
 fun main(args: Array<String>) {
-//    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug")
+    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
     val parser = ArgParser("maven-indexer")
 
     val index by parser.option(
@@ -46,12 +46,12 @@ fun main(args: Array<String>) {
 
     artifactStorage.initialize()
 
-    val indexer = ArtifactIndexer(MavenMetadataParser(networkClient), artifactStorage)
+    val indexer = SingleArtifactIndexer(MavenMetadataParser(networkClient), artifactStorage)
 
     runBlocking {
         when {
             index == true -> processArtifactsIndexing(
-                FullMavenArtifactCrawler(
+                FullMavenArtifactIndexer(
                     indexer = indexer,
                     webPageLinkUrlParser = WebPageLinkUrlParser(networkClient)
                 )
@@ -62,7 +62,7 @@ fun main(args: Array<String>) {
             }
 
             indexFromCsv != null -> processArtifactsIndexing(
-                CsvArtifactCrawler(File(indexFromCsv!!), indexer)
+                CsvArtifactIndexer(File(indexFromCsv!!), indexer)
             )
 
             search != null -> processArtifactSearch(search!!, artifactStorage)
@@ -94,9 +94,9 @@ private fun processAvailableTargets(
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-private suspend fun processArtifactsIndexing(crawler: ArtifactCrawler) {
+private suspend fun processArtifactsIndexing(indexer: MultipleArtifactIndexer) {
     println("Start artifacts indexing...")
-    crawler.crawlAndIndex()
+    indexer.index()
         .flowOn(Dispatchers.IO)
         .collect { progress ->
             if (progress.total != null) {

@@ -1,4 +1,4 @@
-package com.liarstudio.maven_indexer.indexer.data
+package com.liarstudio.maven_indexer.data.storage
 
 import org.jetbrains.exposed.dao.id.LongIdTable
 

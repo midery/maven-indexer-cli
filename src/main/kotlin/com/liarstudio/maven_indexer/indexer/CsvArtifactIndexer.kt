@@ -1,7 +1,5 @@
-package com.liarstudio.maven_indexer.crawler
+package com.liarstudio.maven_indexer.indexer
 
-import com.liarstudio.maven_indexer.crawler.ArtifactCrawler.Progress
-import com.liarstudio.maven_indexer.indexer.ArtifactIndexer
 import com.liarstudio.maven_indexer.models.Artifact
 import com.opencsv.CSVReaderHeaderAware
 import kotlinx.coroutines.async
@@ -16,15 +14,15 @@ import java.io.FileReader
 /**
  * TODO: Error handling and logging
  */
-class CsvArtifactCrawler(
+class CsvArtifactIndexer(
     private val csvFile: File,
-    private val indexer: ArtifactIndexer
-) : ArtifactCrawler {
+    private val indexer: SingleArtifactIndexer
+) : MultipleArtifactIndexer {
 
     private val mutex = Mutex()
 
-    override suspend fun crawlAndIndex(): Flow<Progress> = channelFlow {
-        channel.send(Progress(null, 0))
+    override suspend fun index(): Flow<MultipleArtifactIndexer.Progress> = channelFlow {
+        channel.send(MultipleArtifactIndexer.Progress(null, 0))
         val reader = CSVReaderHeaderAware(FileReader(csvFile.absolutePath))
         val artifacts = mutableListOf<Artifact>()
         var row: Map<String, String>? = reader.readMap()
@@ -40,7 +38,7 @@ class CsvArtifactCrawler(
         val artifactsSize = artifacts.size
         val progressStep = artifactsSize / 100
 
-        channel.send(Progress(artifacts.size, 0))
+        channel.send(MultipleArtifactIndexer.Progress(artifacts.size, 0))
         var processedArtifactsCount = 0
         var lastSentProgress = 0
 
@@ -51,12 +49,12 @@ class CsvArtifactCrawler(
                     processedArtifactsCount++
                     if (processedArtifactsCount - lastSentProgress > progressStep) {
                         lastSentProgress = processedArtifactsCount
-                        channel.send(Progress(artifactsSize, processedArtifactsCount))
+                        channel.send(MultipleArtifactIndexer.Progress(artifactsSize, processedArtifactsCount))
                     }
                 }
             }
         }
             .awaitAll()
-        channel.send(Progress(artifacts.size, artifacts.size))
+        channel.send(MultipleArtifactIndexer.Progress(artifacts.size, artifacts.size))
     }
 }

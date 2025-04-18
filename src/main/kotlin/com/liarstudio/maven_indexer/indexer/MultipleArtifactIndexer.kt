@@ -1,10 +1,10 @@
-package com.liarstudio.maven_indexer.crawler
+package com.liarstudio.maven_indexer.indexer
 
 import kotlinx.coroutines.flow.Flow
 
-interface ArtifactCrawler {
+interface MultipleArtifactIndexer {
 
-    suspend fun crawlAndIndex(): Flow<Progress>
+    suspend fun index(): Flow<Progress>
 
     class Progress(val total: Int?, val current: Int) {
         companion object {
