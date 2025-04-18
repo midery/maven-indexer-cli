@@ -13,46 +13,50 @@ class ArtifactKmpTargetsExtractor(
         )
             .asSequence()
             .map { it.trim('/') }
-            .filter {
-                kmpTargets.any { suffix ->
-                    it.equals(
-                        "${artifact.artifactId}-$suffix",
-                        ignoreCase = true
-                    )
-                }
-            }
+            .filter { it.isKmpVariationOf(artifact) }
             .map { link -> Artifact(artifact.groupId, link) }
             .toList()
     }
 
-    private val kmpTargets = buildSet {
-        val architectures = listOf(
-            "arm64", "x64", "arm32", "arm64", "arm32hfp", "x86", "mips32", "mipsel32"
-        )
+    companion object {
 
-        add("native")
-        add("common")
-        add("jvm")
-        add("android")
-        add("js")
-        add("jsir")
-        add("wasm")
-        add("wasmjs")
-        add("wasm32")
-        for (arch in architectures) {
-            add("ios$arch")
-            add("iossimulator$arch")
-            add("androidnative$arch")
-            add("linux$arch")
-            add("mingw$arch")
-            add("watchos$arch")
-            add("macos$arch")
-            add("tvos$arch")
-            add("tvossimulator$arch")
-            add("watchossimulator$arch")
-            add("watchosdevice$arch")
-            add("windows$arch")
+        fun String.isKmpVariationOf(originalArtifact: Artifact): Boolean {
+            return KMP_TARGETS.any { suffix ->
+                this.equals(
+                    "${originalArtifact.artifactId}-$suffix",
+                    ignoreCase = true
+                )
+            }
+        }
+
+        private val KMP_TARGETS = buildSet {
+            val architectures = listOf(
+                "arm64", "x64", "arm32", "arm64", "arm32hfp", "x86", "mips32", "mipsel32"
+            )
+
+            add("native")
+            add("common")
+            add("jvm")
+            add("android")
+            add("js")
+            add("jsir")
+            add("wasm")
+            add("wasmjs")
+            add("wasm32")
+            for (arch in architectures) {
+                add("ios$arch")
+                add("iossimulator$arch")
+                add("androidnative$arch")
+                add("linux$arch")
+                add("mingw$arch")
+                add("watchos$arch")
+                add("macos$arch")
+                add("tvos$arch")
+                add("tvossimulator$arch")
+                add("watchossimulator$arch")
+                add("watchosdevice$arch")
+                add("windows$arch")
+            }
         }
     }
-
 }

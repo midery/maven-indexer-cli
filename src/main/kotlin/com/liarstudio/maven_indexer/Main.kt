@@ -7,6 +7,7 @@ import com.liarstudio.maven_indexer.data.network.NetworkClient
 import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor
+import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor.Companion.isKmpVariationOf
 import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
@@ -97,9 +98,11 @@ private fun processArtifactSearch(query: String, artifactStorage: ArtifactStorag
 private fun processAvailableTargets(
     artifactInfo: String, artifactStorage: ArtifactStorage
 ) {
-    val targets = artifactStorage.getArtifactTargets(artifact = parseArtifact(artifactInfo))
+    val originalArtifact = parseArtifact(artifactInfo)
+    val targets = artifactStorage.getArtifactTargets(artifact = originalArtifact)
+        .filter { it.artifactId.isKmpVariationOf(originalArtifact) }
     if (targets.isEmpty()) {
-        println("No targets found")
+        println("No Kotlin Multiplatform Targets found for '$artifactInfo'")
         return
     } else {
         println("All Kotlin Multiplatform Targets for '$artifactInfo': ")
