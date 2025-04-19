@@ -12,7 +12,7 @@ class MavenMetadataParser(
 ) {
 
     suspend fun parse(artifact: Artifact): ArtifactVersionMetadata {
-        val metadataUrl = "$host${artifact.urlPath}/maven-metadata.xml"
+        val metadataUrl = "$host${artifact.urlPath}/$MAVEN_METADATA_FILE"
         val xml = networkClient.getBody(metadataUrl)
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
         val documentElement = doc.documentElement
@@ -38,4 +38,7 @@ class MavenMetadataParser(
         return latestFromMetadata ?: return allVersions.maxOrNull()
     }
 
+    companion object {
+        const val MAVEN_METADATA_FILE = "maven-metadata.xml"
+    }
 }

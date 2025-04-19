@@ -1,6 +1,6 @@
 package com.liarstudio.maven_indexer.models
 
-data class IndexedArtifact(
+data class VersionedArtifact(
     val groupId: String,
     val artifactId: String,
     val version: String,

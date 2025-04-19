@@ -6,6 +6,7 @@ import com.liarstudio.maven_indexer.indexer.FullMavenArtifactIndexer
 import com.liarstudio.maven_indexer.data.network.NetworkClient
 import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
+import com.liarstudio.maven_indexer.indexer.VersionOnlyArtifactIndexer
 import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor
 import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor.Companion.isKmpVariationOf
 import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
@@ -43,9 +44,7 @@ fun main(args: Array<String>) {
     val indexFromCsv by parser.option(
         ArgType.String,
         shortName = "icsv",
-        description = "Index from CSV file. CSV should be specified in input format with two columns: 'namespace' for artifact's groupId and 'name' for artifactId. \n" +
-                "This program will try to index all the artifacts from the CSV file, as well as their KMP targets.\nFor example, if you add a row with 'ktor-network' library, " +
-                "it will index all the possible kmp targets: \n* ktor-network-js, \n* ktor-network-jvm, \n* ktor-network-iosx64, etc."
+        description = "Index from CSV file. CSV should be specified in input format with two columns: 'namespace' for artifact's groupId and 'name' for artifactId. \n" + "This program will try to index all the artifacts from the CSV file, as well as their KMP targets.\nFor example, if you add a row with 'ktor-network' library, " + "it will index all the possible kmp targets: \n* ktor-network-js, \n* ktor-network-jvm, \n* ktor-network-iosx64, etc."
     )
     val targets by parser.option(
         ArgType.String,
@@ -56,6 +55,12 @@ fun main(args: Array<String>) {
         ArgType.String,
         shortName = "v",
         description = "Find single artifact's available Versions. Input format: group:artifactId"
+    )
+
+    val refresh by parser.option(
+        ArgType.Boolean,
+        shortName = "r",
+        description = "Refreshes already indexed artifact versions. This action should be faster than refreshing whole Maven Central, and can be performed periodically."
     )
 
     parser.parse(args)
@@ -72,8 +77,7 @@ fun main(args: Array<String>) {
             index == true -> processArtifactsIndexing(
                 indexer = FullMavenArtifactIndexer(
                     indexer = indexer, webPageLinkUrlParser = WebPageLinkUrlParser(networkClient)
-                ),
-                progressRenderer = progressRenderer
+                ), progressRenderer = progressRenderer
             )
 
             indexArtifact != null -> {
@@ -86,11 +90,17 @@ fun main(args: Array<String>) {
                     indexer = indexer,
                     csvParser = CsvArtifactsParser(),
                     kmpVariantsExtractor = ArtifactKmpTargetsExtractor(WebPageLinkUrlParser(networkClient)),
-                ),
-                progressRenderer = progressRenderer
+                ), progressRenderer = progressRenderer
             )
 
             search != null -> processArtifactSearch(search!!, artifactStorage)
+            refresh != null -> processArtifactsIndexing(
+                indexer = VersionOnlyArtifactIndexer(
+                    artifactStorage, indexer
+                ),
+                progressRenderer
+            )
+
             targets != null -> processAvailableTargets(targets!!, artifactStorage)
             versions != null -> processAvailableVersions(versions!!, artifactStorage)
             else -> println("Use --help to see options.")
@@ -99,7 +109,7 @@ fun main(args: Array<String>) {
 }
 
 private fun processArtifactSearch(query: String, artifactStorage: ArtifactStorage) {
-    artifactStorage.getArtifacts(query, limit = 50).mapIndexed { i, result ->
+    artifactStorage.searchArtifacts(query, limit = 50).mapIndexed { i, result ->
         val printingIndex = if (i < 9) "0${i + 1}" else "${i + 1}"
         println("$printingIndex. $result")
     }
@@ -116,9 +126,7 @@ private fun processAvailableTargets(
         return
     } else {
         println("All Kotlin Multiplatform Targets for '$artifactInfo': ")
-        targets
-            .sorted()
-            .forEach { println("* $it") }
+        targets.sorted().forEach { println("* $it") }
     }
 }
 
@@ -131,15 +139,14 @@ private fun processAvailableVersions(
         return
     } else {
         println("All Versions for '$artifactInfo': ")
-        versionsMeta.versions.sortedDescending()
-            .forEach { version ->
-                val versionSuffix = when (version) {
-                    versionsMeta.latestVersion -> "(latest)"
-                    versionsMeta.releaseVersion -> "(release)"
-                    else -> ""
-                }
-                println("* $version $versionSuffix")
+        versionsMeta.versions.sortedDescending().forEach { version ->
+            val versionSuffix = when (version) {
+                versionsMeta.latestVersion -> "(latest)"
+                versionsMeta.releaseVersion -> "(release)"
+                else -> ""
             }
+            println("* $version $versionSuffix")
+        }
     }
 
 }
@@ -147,18 +154,13 @@ private fun processAvailableVersions(
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 private suspend fun processArtifactsIndexing(indexer: MultipleArtifactIndexer, progressRenderer: ProgressRenderer) {
     println("Start artifacts indexing...")
-    indexer.index()
-        .flowOn(Dispatchers.IO)
-        .throttleLatest(1.seconds)
-        .collect { progress ->
-            progressRenderer.render(progress)
-        }
+    indexer.index().flowOn(Dispatchers.IO).throttleLatest(1.seconds).collect { progress ->
+        progressRenderer.render(progress)
+    }
 
 }
 
-fun <T> Flow<T>.throttleLatest(duration: Duration): Flow<T> = this
-    .conflate()
-    .transform {
-        emit(it)
-        delay(duration)
-    }
+fun <T> Flow<T>.throttleLatest(duration: Duration): Flow<T> = this.conflate().transform {
+    emit(it)
+    delay(duration)
+}

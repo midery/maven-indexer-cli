@@ -1,7 +1,7 @@
 package com.liarstudio.maven_indexer.data.storage
 
 import com.liarstudio.maven_indexer.models.Artifact
-import com.liarstudio.maven_indexer.models.IndexedArtifact
+import com.liarstudio.maven_indexer.models.VersionedArtifact
 import com.liarstudio.maven_indexer.models.ArtifactVersionMetadata
 import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.sync.Mutex
@@ -13,8 +13,13 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
+import org.jetbrains.exposed.sql.count
+import org.jetbrains.exposed.sql.countDistinct
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.selectAllBatched
+import org.jetbrains.exposed.sql.selectBatched
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
@@ -140,7 +145,23 @@ class ArtifactStorage {
         }
     }
 
-    fun getArtifacts(query: String, limit: Int = 50): List<IndexedArtifact> =
+    fun getArtifactsCount(): Int = transaction {
+        ArtifactDao
+            .slice(ArtifactDao.id.count())
+            .selectAll()
+            .single()[ArtifactDao.id.count()]
+            .toInt()
+    }
+
+    fun getArtifacts(limit: Int, offset: Long): List<Artifact> = transaction {
+        ArtifactDao.selectAll()
+            .limit(limit, offset)
+            .map {
+                Artifact(it[ArtifactDao.groupId], it[ArtifactDao.artifactId])
+            }
+    }
+
+    fun searchArtifacts(query: String, limit: Int = 50): List<VersionedArtifact> =
         transaction {
             val trigrams = generateTrigramString(query, " OR ")
             exec(
@@ -155,9 +176,9 @@ class ArtifactStorage {
         LIMIT $limit
     """.trimIndent(),
             ) {
-                val results = mutableListOf<IndexedArtifact>()
+                val results = mutableListOf<VersionedArtifact>()
                 while (it.next()) {
-                    results += IndexedArtifact(
+                    results += VersionedArtifact(
                         groupId = it.getString("group_id"),
                         artifactId = it.getString("artifact_id"),
                         version = it.getString("version")

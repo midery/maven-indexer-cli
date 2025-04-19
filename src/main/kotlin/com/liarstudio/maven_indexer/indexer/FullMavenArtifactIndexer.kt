@@ -3,6 +3,7 @@ package com.liarstudio.maven_indexer.indexer
 import com.liarstudio.maven_indexer.MAVEN_CENTRAL_REPO_URL
 import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer.Progress
 import com.liarstudio.maven_indexer.models.Artifact
+import com.liarstudio.maven_indexer.parser.MavenMetadataParser.Companion.MAVEN_METADATA_FILE
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TODO: Test this logic
- * TODO: Error handling
  */
 class FullMavenArtifactIndexer(
     private val host: String = MAVEN_CENTRAL_REPO_URL,
@@ -91,7 +91,7 @@ class FullMavenArtifactIndexer(
 
         logger.debug("Found links: ${links.size}")
 
-        val artifactMetadata = links.find { link -> link.endsWith(suffix = MAVEN_METADATA_FILE) }
+        val artifactMetadata = links.find { link -> link.endsWith(MAVEN_METADATA_FILE) }
         if (artifactMetadata != null) {
             val artifact = processArtifactMetadata(
                 url = url,
@@ -112,7 +112,7 @@ class FullMavenArtifactIndexer(
         }
     }
 
-    private suspend fun CoroutineScope.processArtifactMetadata(
+    private suspend fun processArtifactMetadata(
         url: String,
         progressArtifactCount: AtomicInteger,
         errorsCount: AtomicInteger,
@@ -161,6 +161,5 @@ class FullMavenArtifactIndexer(
 
     companion object {
         const val PARALLELISM = 256
-        const val MAVEN_METADATA_FILE = "maven-metadata.xml"
     }
 }
