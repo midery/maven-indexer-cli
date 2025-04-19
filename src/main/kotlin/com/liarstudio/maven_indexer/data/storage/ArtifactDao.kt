@@ -8,6 +8,6 @@ object ArtifactDao : LongIdTable("artifacts") {
 
 
     init {
-        index(true, artifactId, groupId) // Индекс для ускорения поиска по артефакту и версии
+        index(true, artifactId, groupId) // Index for faster search through artifacts table
     }
 }

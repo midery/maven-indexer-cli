@@ -100,6 +100,7 @@ class FullMavenArtifactIndexerTest {
         assertEquals(0, result.errorCount)
     }
 
+    // Large test, executed for ~15-30 seconds
     @Test
     fun `GIVEN 10_000 3-level urls WHEN indexed THEN processed correctly in parallel`() = runBlocking {
         val baseUrl = "https://mock.repo/"
@@ -157,6 +158,6 @@ class FullMavenArtifactIndexerTest {
         // Sequentially: 10_000 * 10ms = 100s
         // Parallel: < 10s
         println("✅ BFS-3-level load test finished in $elapsed ms")
-        assertTrue(elapsed < 10_000, "Обработка заняла слишком много времени")
+        assertTrue(elapsed < 10_000, "Waiting to finish faster because of parallelism")
     }
 }

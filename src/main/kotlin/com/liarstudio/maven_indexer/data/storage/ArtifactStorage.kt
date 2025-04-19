@@ -35,6 +35,7 @@ class ArtifactStorage {
 
             StoreStrategy.IN_MEMORY -> {
                 "jdbc:sqlite:file:test?mode=memory&cache=shared"
+                    // Trick to enable in-memory DB connection in Unit tests
                     .also(DriverManager::getConnection)
             }
         }
@@ -161,6 +162,7 @@ class ArtifactStorage {
 
     fun searchArtifacts(query: String, limit: Int = 50): List<VersionedArtifact> =
         transaction {
+            // Generate trigram strings separated with `OR`, so we can
             val trigrams = generateTrigramString(query, " OR ")
             exec(
                 """
