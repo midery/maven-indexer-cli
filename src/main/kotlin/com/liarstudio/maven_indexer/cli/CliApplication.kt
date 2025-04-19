@@ -22,7 +22,7 @@ import com.liarstudio.maven_indexer.indexer.parser.XmlMetadataParser
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
-class ApplicationRunner {
+class CliApplication {
 
     fun run(
         index: Boolean?,

@@ -1,6 +1,6 @@
 package com.liarstudio.maven_indexer
 
-import com.liarstudio.maven_indexer.cli.ApplicationRunner
+import com.liarstudio.maven_indexer.cli.CliApplication
 import com.liarstudio.maven_indexer.cli.logger.LogLevel
 import kotlinx.cli.*
 
@@ -55,7 +55,7 @@ fun main(args: Array<String>) {
 
     parser.parse(args)
 
-    ApplicationRunner()
+    CliApplication()
         .run(
             index = index,
             indexGroup = indexGroup,
