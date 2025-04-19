@@ -14,12 +14,9 @@ import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.count
-import org.jetbrains.exposed.sql.countDistinct
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.selectAllBatched
-import org.jetbrains.exposed.sql.selectBatched
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
@@ -27,10 +24,20 @@ class ArtifactStorage {
 
     val mutex = Mutex()
 
-    fun initialize() {
-        val dotenv = dotenv { ignoreIfMissing = true }
-        val dbPath = dotenv["DB_PATH"] ?: "maven.db"
-        Database.connect("jdbc:sqlite:$dbPath", driver = "org.sqlite.JDBC")
+    fun initialize(storeStrategy: StoreStrategy = StoreStrategy.DISK) {
+        val connectUrl = when (storeStrategy) {
+            StoreStrategy.DISK -> {
+                val dotenv = dotenv { ignoreIfMissing = true }
+                val dbPath = dotenv["DB_PATH"] ?: "maven.db"
+                "jdbc:sqlite:$dbPath"
+            }
+
+            StoreStrategy.IN_MEMORY -> {
+                "jdbc:sqlite::memory:?cache=shared"
+            }
+        }
+        val driver = "org.sqlite.JDBC"
+        Database.connect(connectUrl, driver)
         transaction {
             SchemaUtils.create(ArtifactDao, VersionDao)
             exec(
@@ -70,17 +77,6 @@ class ArtifactStorage {
     """
             )
         }
-    }
-
-    private fun generateTrigramString(word: String, separator: String = " "): String {
-        val input = word.lowercase().normalize()
-        return (0..input.length - 3).joinToString(separator) { i ->
-            input.substring(i, i + 3)
-        }
-    }
-
-    fun String.normalize(): String {
-        return filter(Char::isLetterOrDigit)
     }
 
     private fun updateArtifact(artifact: Artifact): Long {
@@ -219,5 +215,20 @@ class ArtifactStorage {
                 version
             }
         ArtifactVersionMetadata(versions, latestVersion, releaseVersion)
+    }
+
+    private fun generateTrigramString(word: String, separator: String = " "): String {
+        val input = word.lowercase().normalize()
+        return (0..input.length - 3).joinToString(separator) { i ->
+            input.substring(i, i + 3)
+        }
+    }
+
+    fun String.normalize(): String {
+        return filter(Char::isLetterOrDigit)
+    }
+
+    enum class StoreStrategy {
+        DISK, IN_MEMORY
     }
 }

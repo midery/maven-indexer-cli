@@ -90,7 +90,11 @@ class FullMavenArtifactIndexer(
                 return
             }
 
-        logger.debug("Found links: ${links.size}")
+        try {
+            logger.debug("Found links: ${links.size}")
+        } catch (e: Exception) {
+            throw IllegalStateException("Failed processing $url: ${e.message}")
+        }
 
         val artifactMetadata = links.find { link -> link.endsWith(MAVEN_METADATA_FILE) }
         if (artifactMetadata != null) {

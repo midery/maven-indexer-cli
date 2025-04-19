@@ -40,7 +40,7 @@ class CsvArtifactIndexer(
                                 artifactsSize
                             )
                         )
-                        kmpVariants
+                        kmpVariants + artifact
                     }
                 }
             }
