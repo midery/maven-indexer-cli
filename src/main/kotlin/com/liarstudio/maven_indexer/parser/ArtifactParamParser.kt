@@ -11,3 +11,6 @@ fun parseArtifact(param: String): Artifact {
     val (groupId, artifactId) = artifactPaths
     return Artifact(artifactId = artifactId, groupId = groupId)
 }
+
+val Artifact.groupIdUrlPath get() = groupId.replace('.', '/')
+val Artifact.urlPath get() = "$groupIdUrlPath/$artifactId"

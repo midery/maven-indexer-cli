@@ -9,6 +9,7 @@ import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.indexer.VersionOnlyArtifactIndexer
 import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor
 import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor.Companion.isKmpVariationOf
+import com.liarstudio.maven_indexer.logger.LogLevel
 import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
 import com.liarstudio.maven_indexer.parser.MavenMetadataParser
 import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
@@ -29,22 +30,37 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>) {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
     val parser = ArgParser("maven-indexer")
 
     val index by parser.option(
         ArgType.Boolean, shortName = "i", description = "Index all dependencies from Maven Central"
     )
-    val search by parser.option(
-        ArgType.String, shortName = "s", description = "Search artifact by name (group or artifactId)"
+
+    val indexGroup by parser.option(
+        ArgType.String,
+        shortName = "ig",
+        description = "Index all dependencies for particular groupId from Maven Central." +
+                "Example input: io.ktor"
     )
+
     val indexArtifact by parser.option(
         ArgType.String, shortName = "ia", description = "Index single artifact. Input format: group:artifactId"
     )
     val indexFromCsv by parser.option(
         ArgType.String,
         shortName = "icsv",
-        description = "Index from CSV file. CSV should be specified in input format with two columns: 'namespace' for artifact's groupId and 'name' for artifactId. \n" + "This program will try to index all the artifacts from the CSV file, as well as their KMP targets.\nFor example, if you add a row with 'ktor-network' library, " + "it will index all the possible kmp targets: \n* ktor-network-js, \n* ktor-network-jvm, \n* ktor-network-iosx64, etc."
+        description = "Index from CSV file. CSV should be specified in input format with two columns: 'namespace' for artifact's groupId and 'name' for artifactId. \n\t" +
+                "This program will try to index all the artifacts from the CSV file, as well as their KMP targets.\n\tFor example, if you add a row with 'ktor-network' library, " +
+                "it will index all the possible kmp targets: \n\t* ktor-network-js, \n\t* ktor-network-jvm, \n\t* ktor-network-iosx64, etc."
+    )
+    val refresh by parser.option(
+        ArgType.Boolean,
+        shortName = "r",
+        description = "Refreshes already indexed artifact versions. This action should be faster than refreshing whole Maven Central, and can be performed periodically."
+    )
+
+    val search by parser.option(
+        ArgType.String, shortName = "s", description = "Search artifact by name (group or artifactId)"
     )
     val targets by parser.option(
         ArgType.String,
@@ -57,13 +73,15 @@ fun main(args: Array<String>) {
         description = "Find single artifact's available Versions. Input format: group:artifactId"
     )
 
-    val refresh by parser.option(
-        ArgType.Boolean,
-        shortName = "r",
-        description = "Refreshes already indexed artifact versions. This action should be faster than refreshing whole Maven Central, and can be performed periodically."
+    val logLevel by parser.option(
+        ArgType.Choice<LogLevel>(), shortName = "log", description = "Specife desired log  level. "
     )
+        .default(LogLevel.warn)
 
     parser.parse(args)
+
+    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", logLevel.name)
+
     val progressRenderer = ProgressRenderer()
     val networkClient = NetworkClient()
     val artifactStorage = ArtifactStorage()
@@ -73,11 +91,23 @@ fun main(args: Array<String>) {
     val indexer = SingleArtifactIndexer(MavenMetadataParser(networkClient), artifactStorage)
 
     runBlocking {
+
         when {
             index == true -> processArtifactsIndexing(
                 indexer = FullMavenArtifactIndexer(
-                    indexer = indexer, webPageLinkUrlParser = WebPageLinkUrlParser(networkClient)
-                ), progressRenderer = progressRenderer
+                    indexer = indexer,
+                    webPageLinkUrlParser = WebPageLinkUrlParser(networkClient),
+                ),
+                progressRenderer = progressRenderer
+            )
+
+            indexGroup != null -> processArtifactsIndexing(
+                indexer = FullMavenArtifactIndexer(
+                    indexer = indexer,
+                    webPageLinkUrlParser = WebPageLinkUrlParser(networkClient),
+                    additionalPath = indexGroup!!.replace('.', '/') + '/'
+                ),
+                progressRenderer = progressRenderer
             )
 
             indexArtifact != null -> {
