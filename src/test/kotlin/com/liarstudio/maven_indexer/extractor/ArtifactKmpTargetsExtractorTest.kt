@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.*
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class ArtifactKmpTargetsExtractorTest {
 
     private val htmlExtractor: HtmlPageLinkExtractor = mock()

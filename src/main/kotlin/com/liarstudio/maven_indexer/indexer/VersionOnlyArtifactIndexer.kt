@@ -2,6 +2,7 @@ package com.liarstudio.maven_indexer.indexer
 
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer.Progress
+import io.ktor.network.tls.NoPrivateKeyException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class VersionOnlyArtifactIndexer(
     private val artifactStorage: ArtifactStorage,
     private val artifactIndexer: SingleArtifactIndexer,
+    private val chunkSize: Int = CHUNK_SIZE,
 ) : MultipleArtifactIndexer {
 
     private val semaphore = Semaphore(PARALLELISM)
@@ -23,10 +25,10 @@ class VersionOnlyArtifactIndexer(
         val errorsCount = AtomicInteger(0)
         val progressCount = AtomicInteger(0)
 
-        val chunkSteps = artifactsCount / CHUNK_SIZE
+        val chunkSteps = artifactsCount / chunkSize
 
         for (i in 0..chunkSteps) {
-            val limit = CHUNK_SIZE
+            val limit = chunkSize
             val offset = i * limit
             artifactStorage.getArtifacts(limit = limit, offset = offset.toLong()).map {
                 async {
