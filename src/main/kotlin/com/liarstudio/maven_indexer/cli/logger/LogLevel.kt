@@ -1,4 +1,4 @@
-package com.liarstudio.maven_indexer.logger
+package com.liarstudio.maven_indexer.cli.logger
 
 enum class LogLevel {
     warn,

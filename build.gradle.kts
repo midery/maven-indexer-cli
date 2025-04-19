@@ -18,7 +18,18 @@ dependencies {
     implementation("io.ktor:ktor-client-core:3.1.2")
     implementation("io.ktor:ktor-client-cio:3.1.2")
     implementation("org.slf4j:slf4j-simple:2.0.17")
+
+    testImplementation("org.mockito:mockito-core:5.17.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.7.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(kotlin("test"))
 }
+
+tasks.test {
+    useJUnitPlatform()
+}
+
 
 application {
     mainClass.set("com.liarstudio.maven_indexer.MainKt")

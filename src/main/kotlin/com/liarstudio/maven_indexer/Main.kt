@@ -7,14 +7,16 @@ import com.liarstudio.maven_indexer.data.network.NetworkClient
 import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.indexer.VersionOnlyArtifactIndexer
-import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor
-import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor.Companion.isKmpVariationOf
-import com.liarstudio.maven_indexer.logger.LogLevel
-import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
-import com.liarstudio.maven_indexer.parser.MavenMetadataParser
-import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
-import com.liarstudio.maven_indexer.parser.parseArtifact
-import com.liarstudio.maven_indexer.printer.ProgressRenderer
+import com.liarstudio.maven_indexer.indexer.extractor.ArtifactKmpTargetsExtractor
+import com.liarstudio.maven_indexer.indexer.extractor.ArtifactKmpTargetsExtractor.Companion.isKmpVariationOf
+import com.liarstudio.maven_indexer.cli.logger.LogLevel
+import com.liarstudio.maven_indexer.models.Artifact
+import com.liarstudio.maven_indexer.cli.parser.ArtifactParamParser
+import com.liarstudio.maven_indexer.indexer.parser.CsvArtifactsParser
+import com.liarstudio.maven_indexer.indexer.extractor.MavenMetadataExtractor
+import com.liarstudio.maven_indexer.indexer.extractor.HtmlPageLinkExtractor
+import com.liarstudio.maven_indexer.indexer.parser.XmlMetadataParser
+import com.liarstudio.maven_indexer.cli.printer.ProgressRenderer
 import kotlinx.cli.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -85,10 +87,12 @@ fun main(args: Array<String>) {
     val progressRenderer = ProgressRenderer()
     val networkClient = NetworkClient()
     val artifactStorage = ArtifactStorage()
+    val parseArtifact = ArtifactParamParser()
+    val xmlParser = XmlMetadataParser()
 
     artifactStorage.initialize()
 
-    val indexer = SingleArtifactIndexer(MavenMetadataParser(networkClient), artifactStorage)
+    val indexer = SingleArtifactIndexer(MavenMetadataExtractor(networkClient, xmlParser), artifactStorage)
 
     runBlocking {
 
@@ -96,7 +100,7 @@ fun main(args: Array<String>) {
             index == true -> processArtifactsIndexing(
                 indexer = FullMavenArtifactIndexer(
                     indexer = indexer,
-                    webPageLinkUrlParser = WebPageLinkUrlParser(networkClient),
+                    htmlPageLinkExtractor = HtmlPageLinkExtractor(networkClient),
                 ),
                 progressRenderer = progressRenderer
             )
@@ -104,7 +108,7 @@ fun main(args: Array<String>) {
             indexGroup != null -> processArtifactsIndexing(
                 indexer = FullMavenArtifactIndexer(
                     indexer = indexer,
-                    webPageLinkUrlParser = WebPageLinkUrlParser(networkClient),
+                    htmlPageLinkExtractor = HtmlPageLinkExtractor(networkClient),
                     additionalPath = indexGroup!!.replace('.', '/') + '/'
                 ),
                 progressRenderer = progressRenderer
@@ -119,7 +123,7 @@ fun main(args: Array<String>) {
                     csvFile = File(indexFromCsv!!),
                     indexer = indexer,
                     csvParser = CsvArtifactsParser(),
-                    kmpVariantsExtractor = ArtifactKmpTargetsExtractor(WebPageLinkUrlParser(networkClient)),
+                    kmpVariantsExtractor = ArtifactKmpTargetsExtractor(HtmlPageLinkExtractor(networkClient)),
                 ), progressRenderer = progressRenderer
             )
 
@@ -131,8 +135,8 @@ fun main(args: Array<String>) {
                 progressRenderer
             )
 
-            targets != null -> processAvailableTargets(targets!!, artifactStorage)
-            versions != null -> processAvailableVersions(versions!!, artifactStorage)
+            targets != null -> processAvailableTargets(parseArtifact(targets!!), artifactStorage)
+            versions != null -> processAvailableVersions(parseArtifact(versions!!), artifactStorage)
             else -> println("Use --help to see options.")
         }
     }
@@ -146,29 +150,28 @@ private fun processArtifactSearch(query: String, artifactStorage: ArtifactStorag
 }
 
 private fun processAvailableTargets(
-    artifactInfo: String, artifactStorage: ArtifactStorage
+    artifact: Artifact, artifactStorage: ArtifactStorage
 ) {
-    val originalArtifact = parseArtifact(artifactInfo)
-    val targets = artifactStorage.getArtifactTargets(artifact = originalArtifact)
-        .filter { it.artifactId.isKmpVariationOf(originalArtifact) }
+    val targets = artifactStorage.getArtifactTargets(artifact = artifact)
+        .filter { it.artifactId.isKmpVariationOf(artifact) }
     if (targets.isEmpty()) {
-        println("No Kotlin Multiplatform Targets found for '$artifactInfo'")
+        println("No Kotlin Multiplatform Targets found for '$artifact'")
         return
     } else {
-        println("All Kotlin Multiplatform Targets for '$artifactInfo': ")
+        println("All Kotlin Multiplatform Targets for '$artifact': ")
         targets.sorted().forEach { println("* $it") }
     }
 }
 
 private fun processAvailableVersions(
-    artifactInfo: String, artifactStorage: ArtifactStorage
+    artifact: Artifact, artifactStorage: ArtifactStorage
 ) {
-    val versionsMeta = artifactStorage.getArtifactVersions(artifact = parseArtifact(artifactInfo))
+    val versionsMeta = artifactStorage.getArtifactVersions(artifact = artifact)
     if (versionsMeta.versions.isEmpty()) {
         println("No versions found")
         return
     } else {
-        println("All Versions for '$artifactInfo': ")
+        println("All Versions for '$artifact': ")
         versionsMeta.versions.sortedDescending().forEach { version ->
             val versionSuffix = when (version) {
                 versionsMeta.latestVersion -> "(latest)"

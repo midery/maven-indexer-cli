@@ -1,8 +1,8 @@
 package com.liarstudio.maven_indexer.indexer
 
 import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer.Progress
-import com.liarstudio.maven_indexer.indexer.kmp.ArtifactKmpTargetsExtractor
-import com.liarstudio.maven_indexer.parser.CsvArtifactsParser
+import com.liarstudio.maven_indexer.indexer.extractor.ArtifactKmpTargetsExtractor
+import com.liarstudio.maven_indexer.indexer.parser.CsvArtifactsParser
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
@@ -23,7 +23,7 @@ class CsvArtifactIndexer(
 
     override suspend fun index(): Flow<Progress> = channelFlow {
         channel.send(readFileStageProgress)
-        val csvArtifacts = csvParser.parse(csvFile)
+        val csvArtifacts = csvParser.invoke(csvFile)
         var artifactsSize = csvArtifacts.size
         val processedArtifactsCount = AtomicInteger(0)
         val processingErrors = AtomicInteger(0)

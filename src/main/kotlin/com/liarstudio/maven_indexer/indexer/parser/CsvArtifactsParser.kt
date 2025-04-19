@@ -1,4 +1,4 @@
-package com.liarstudio.maven_indexer.parser
+package com.liarstudio.maven_indexer.indexer.parser
 
 import com.liarstudio.maven_indexer.models.Artifact
 import com.opencsv.CSVReaderHeaderAware
@@ -7,7 +7,7 @@ import java.io.FileReader
 
 class CsvArtifactsParser {
 
-    fun parse(csvFile: File): List<Artifact> {
+    operator fun invoke(csvFile: File): List<Artifact> {
         val artifacts = mutableListOf<Artifact>()
         val reader = CSVReaderHeaderAware(FileReader(csvFile.absolutePath))
         var row: Map<String, String>? = reader.readMap()
@@ -17,6 +17,8 @@ class CsvArtifactsParser {
             if (!group.isNullOrBlank() && !artifactId.isNullOrBlank()) {
                 val artifact = Artifact(group, artifactId)
                 artifacts.add(artifact)
+            } else {
+                throw IllegalStateException("Invalid file format: $csvFile. It should have headers named  'namespace' and 'name'.")
             }
             row = reader.readMap()
         }

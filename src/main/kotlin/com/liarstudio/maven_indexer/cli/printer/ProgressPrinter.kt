@@ -1,4 +1,4 @@
-package com.liarstudio.maven_indexer.printer
+package com.liarstudio.maven_indexer.cli.printer
 
 import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer.Progress
 

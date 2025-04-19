@@ -3,8 +3,8 @@ package com.liarstudio.maven_indexer.indexer
 import com.liarstudio.maven_indexer.MAVEN_CENTRAL_REPO_URL
 import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer.Progress
 import com.liarstudio.maven_indexer.models.Artifact
-import com.liarstudio.maven_indexer.parser.MavenMetadataParser.Companion.MAVEN_METADATA_FILE
-import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
+import com.liarstudio.maven_indexer.indexer.extractor.MavenMetadataExtractor.Companion.MAVEN_METADATA_FILE
+import com.liarstudio.maven_indexer.indexer.extractor.HtmlPageLinkExtractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,7 +26,7 @@ class FullMavenArtifactIndexer(
     private val host: String = MAVEN_CENTRAL_REPO_URL,
     private val additionalPath: String = "",
     private val indexer: SingleArtifactIndexer,
-    private val webPageLinkUrlParser: WebPageLinkUrlParser,
+    private val htmlPageLinkExtractor: HtmlPageLinkExtractor,
 ) : MultipleArtifactIndexer {
 
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
@@ -82,9 +82,10 @@ class FullMavenArtifactIndexer(
         logger.debug("Processing: $url")
         activeTasks.incrementAndGet()
         val links = runCatching {
-            webPageLinkUrlParser.parse(url)
+            htmlPageLinkExtractor.invoke(url)
         }
             .getOrElse {
+                logger.info("⚠️ Error loading $url: ${it.message}")
                 errorsCount.incrementAndGet()
                 return
             }

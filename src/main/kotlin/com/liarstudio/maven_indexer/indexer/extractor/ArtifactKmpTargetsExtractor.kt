@@ -1,17 +1,16 @@
-package com.liarstudio.maven_indexer.indexer.kmp
+package com.liarstudio.maven_indexer.indexer.extractor
 
 import com.liarstudio.maven_indexer.MAVEN_CENTRAL_REPO_URL
 import com.liarstudio.maven_indexer.models.Artifact
-import com.liarstudio.maven_indexer.parser.WebPageLinkUrlParser
-import com.liarstudio.maven_indexer.parser.groupIdUrlPath
+import com.liarstudio.maven_indexer.groupIdUrlPath
 
 class ArtifactKmpTargetsExtractor(
-    private val webPageLinkUrlParser: WebPageLinkUrlParser,
+    private val htmlPageLinkExtractor: HtmlPageLinkExtractor,
     private val host: String = MAVEN_CENTRAL_REPO_URL,
 ) {
 
     suspend fun getKmpVariants(artifact: Artifact): List<Artifact> {
-        return webPageLinkUrlParser.parse(artifact.getArtifactGroupUrl())
+        return htmlPageLinkExtractor.invoke(artifact.getArtifactGroupUrl())
             .asSequence()
             .map { it.trim('/') }
             .filter { it.isKmpVariationOf(artifact) }

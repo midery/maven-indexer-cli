@@ -3,15 +3,15 @@ package com.liarstudio.maven_indexer.indexer
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.ArtifactVersionMetadata
-import com.liarstudio.maven_indexer.parser.MavenMetadataParser
+import com.liarstudio.maven_indexer.indexer.extractor.MavenMetadataExtractor
 
 class SingleArtifactIndexer(
-    private val mavenMetadataParser: MavenMetadataParser,
+    private val mavenMetadataExtractor: MavenMetadataExtractor,
     private val artifactStorage: ArtifactStorage,
 ) {
 
     suspend fun indexArtifact(artifact: Artifact): Result<ArtifactVersionMetadata> = runCatching {
-        val versionMeta = mavenMetadataParser.parse(artifact)
+        val versionMeta = mavenMetadataExtractor(artifact)
 
         artifactStorage.saveArtifact(
             artifact = artifact,

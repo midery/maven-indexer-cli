@@ -1,19 +1,11 @@
-package com.liarstudio.maven_indexer.parser
+package com.liarstudio.maven_indexer.indexer.parser
 
-import com.liarstudio.maven_indexer.MAVEN_CENTRAL_REPO_URL
-import com.liarstudio.maven_indexer.data.network.NetworkClient
-import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.ArtifactVersionMetadata
 import javax.xml.parsers.DocumentBuilderFactory
 
-class MavenMetadataParser(
-    private val networkClient: NetworkClient,
-    private val host: String = MAVEN_CENTRAL_REPO_URL,
-) {
+class XmlMetadataParser {
 
-    suspend fun parse(artifact: Artifact): ArtifactVersionMetadata {
-        val metadataUrl = "$host${artifact.urlPath}/$MAVEN_METADATA_FILE"
-        val xml = networkClient.getBody(metadataUrl)
+    fun parse(xml: String): ArtifactVersionMetadata {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
         val documentElement = doc.documentElement
         val versions = documentElement.getElementsByTagName("version").let { nodes ->
@@ -36,9 +28,5 @@ class MavenMetadataParser(
 
     private fun findLatestVersion(latestFromMetadata: String?, allVersions: List<String>): String? {
         return latestFromMetadata ?: return allVersions.maxOrNull()
-    }
-
-    companion object {
-        const val MAVEN_METADATA_FILE = "maven-metadata.xml"
     }
 }
