@@ -13,13 +13,6 @@ Run the CLI:
 ```bash
 ./gradlew run --args="<your-command-args>"
 ```
-
-Or run the generated jar:
-
-```bash
-java -jar build/libs/maven-indexer-cli.jar <your-command-args>
-```
-
 ---
 
 ## 📦 CLI Commands
