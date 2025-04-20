@@ -54,7 +54,7 @@ class ArtifactStorage {
             SchemaUtils.create(ArtifactDao, VersionDao)
             exec(
                 """
-                        CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_fuzzy_index
+                        CREATE VIRTUAL TABLE IF NOT EXISTS artifacts_search_helper
                         USING fts5(group_id, artifact_id, tokenize="trigram");
                 """
             )
@@ -122,10 +122,10 @@ class ArtifactStorage {
             exec(
                 """
         SELECT a.group_id, a.artifact_id, v.version
-        FROM artifacts_fuzzy_index f
+        FROM artifacts_search_helper f
         JOIN artifacts a ON a.id = f.rowid
         JOIN versions v ON a.id = v.artifact
-        WHERE artifacts_fuzzy_index MATCH '$normalizedQuery'
+        WHERE artifacts_search_helper MATCH '$normalizedQuery'
           AND v.is_release = 1
         ORDER by rank ASC
         LIMIT $limit
@@ -276,14 +276,14 @@ class ArtifactStorage {
     private fun Transaction.updateArtifactTrigrams(artifact: Artifact, artifactDatabaseId: Long) {
         val artifactSearchEntryAlreadyExists = exec(
             """
-            SELECT 1 FROM artifacts_fuzzy_index WHERE rowid = $artifactDatabaseId
+            SELECT 1 FROM artifacts_search_helper WHERE rowid = $artifactDatabaseId
             """
         ) { it.next() } == true
 
         if (!artifactSearchEntryAlreadyExists) {
             exec(
                 """
-        INSERT INTO artifacts_fuzzy_index(rowid, group_id, artifact_id)
+        INSERT INTO artifacts_search_helper(rowid, group_id, artifact_id)
         VALUES ($artifactDatabaseId, '${artifact.groupId.normalize()}', '${artifact.artifactId.normalize()}')
     """
             )

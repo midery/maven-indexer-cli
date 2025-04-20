@@ -31,7 +31,7 @@ class ArtifactStorageTest {
     fun cleanUp() {
         transaction {
             SchemaUtils.drop(ArtifactDao, VersionDao)
-            exec("DROP TABLE IF EXISTS artifacts_fuzzy_index")
+            exec("DROP TABLE IF EXISTS artifacts_search_helper")
         }
     }
 
@@ -131,7 +131,7 @@ class ArtifactStorageTest {
     }
 
     @Test
-    fun `GIVEN 10_000 artifacts WHEN fuzzy searched THEN returns matches quickly`() = runTest {
+    fun `GIVEN 10_000 artifacts WHEN searched THEN returns matches quickly`() = runTest {
         val baseGroup = "org.large"
         val artifactPrefix = "lib"
         val needle = "ser"
@@ -153,8 +153,8 @@ class ArtifactStorageTest {
             assertEquals(results.single(), VersionedArtifact(baseGroup, "kotlinx-serialization-core", "1.7.0"))
         }
 
-        println("Fuzzy search completed in $elapsed ms")
-        assertTrue(elapsed < 100, "Fuzzy search completed should be completed in >100ms")
+        println("Search completed in $elapsed ms")
+        assertTrue(elapsed < 100, "Search completed should be completed in >100ms")
     }
 
 }
