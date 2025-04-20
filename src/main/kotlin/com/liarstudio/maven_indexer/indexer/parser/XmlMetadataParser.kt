@@ -1,9 +1,12 @@
 package com.liarstudio.maven_indexer.indexer.parser
 
+import com.liarstudio.maven_indexer.indexer.parser.comparator.VersionComparator
 import com.liarstudio.maven_indexer.models.ArtifactVersionMetadata
 import javax.xml.parsers.DocumentBuilderFactory
 
-class XmlMetadataParser {
+class XmlMetadataParser(
+    val versionComparator: VersionComparator
+) {
 
     fun parse(xml: String): ArtifactVersionMetadata {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
@@ -27,6 +30,7 @@ class XmlMetadataParser {
     }
 
     private fun findLatestVersion(latestFromMetadata: String?, allVersions: List<String>): String? {
-        return latestFromMetadata ?: return allVersions.maxOrNull()
+        println("latestFromMetadata: $latestFromMetadata")
+        return latestFromMetadata ?: return allVersions.maxWithOrNull(versionComparator)
     }
 }

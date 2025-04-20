@@ -1,6 +1,7 @@
 package com.liarstudio.maven_indexer.cli.processor
 
 import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
+import com.liarstudio.maven_indexer.indexer.parser.comparator.VersionComparator
 import com.liarstudio.maven_indexer.models.Artifact
 
 class SearchVersionsCommandProcessor {
@@ -14,14 +15,20 @@ class SearchVersionsCommandProcessor {
             return
         } else {
             println("All Versions for '$artifact': ")
-            versionsMeta.versions.sortedDescending().forEach { version ->
-                val versionSuffix = when (version) {
-                    versionsMeta.latestVersion -> "(latest)"
-                    versionsMeta.releaseVersion -> "(release)"
-                    else -> ""
+            val latest = versionsMeta.latestVersion
+            val release = versionsMeta.releaseVersion
+            versionsMeta.versions
+                .sortedWith(VersionComparator())
+                .reversed()
+                .forEach { version ->
+                    val versionSuffix = when {
+                        version == latest && version == release -> "(latest, release)"
+                        version == latest -> "(latest)"
+                        version == release -> "(release)"
+                        else -> ""
+                    }
+                    println("* $version $versionSuffix")
                 }
-                println("* $version $versionSuffix")
-            }
         }
     }
 }

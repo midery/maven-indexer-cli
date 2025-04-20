@@ -8,23 +8,17 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doSuspendableAnswer
 import org.mockito.kotlin.wheneverBlocking
 import kotlin.system.measureTimeMillis
-import kotlin.test.assertTrue
 
 class FullMavenArtifactIndexerTest {
     private val htmlPageLinkExtractor: HtmlPageLinkExtractor = mock()
     private val indexer: SingleArtifactIndexer = mock()
-
-    @BeforeEach
-    fun setUp() {
-//        System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
-    }
 
 
     @Test
@@ -102,7 +96,7 @@ class FullMavenArtifactIndexerTest {
 
     // Large test, executed for ~15-30 seconds
     @Test
-    fun `GIVEN 10_000 3-level urls WHEN indexed THEN processed correctly in parallel`() = runBlocking {
+    fun `GIVEN 10_000 3-level urls WHEN indexed THEN processed correctly in parallel`() = runBlocking<Unit> {
         val baseUrl = "https://mock.repo/"
         val groupCount = 100
         val artifactCount = 100

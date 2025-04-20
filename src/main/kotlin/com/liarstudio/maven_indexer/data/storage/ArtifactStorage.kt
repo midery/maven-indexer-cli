@@ -3,7 +3,6 @@ package com.liarstudio.maven_indexer.data.storage
 import com.liarstudio.maven_indexer.models.Artifact
 import com.liarstudio.maven_indexer.models.VersionedArtifact
 import com.liarstudio.maven_indexer.models.ArtifactVersionMetadata
-import io.github.cdimascio.dotenv.dotenv
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.exposed.sql.Column
@@ -28,9 +27,7 @@ class ArtifactStorage {
     fun initialize(storeStrategy: StoreStrategy = StoreStrategy.DISK) {
         val connectUrl = when (storeStrategy) {
             StoreStrategy.DISK -> {
-                val dotenv = dotenv { ignoreIfMissing = true }
-                val dbPath = dotenv["DB_PATH"] ?: "maven.db"
-                "jdbc:sqlite:$dbPath"
+                "jdbc:sqlite:maven.db"
             }
 
             StoreStrategy.IN_MEMORY -> {
@@ -76,7 +73,7 @@ class ArtifactStorage {
             exec(
                 """
         INSERT INTO artifacts_fuzzy_index(rowid, group_id, artifact_id)
-        VALUES ($artifactDatabaseId, '${artifact.groupId}', '${artifact.artifactId}')
+        VALUES ($artifactDatabaseId, '${artifact.groupId.normalize()}', '${artifact.artifactId.normalize()}')
     """
             )
         }
@@ -162,15 +159,14 @@ class ArtifactStorage {
 
     fun searchArtifacts(query: String, limit: Int = 50): List<VersionedArtifact> =
         transaction {
-            // Generate trigram strings separated with `OR`, so we can
-            val trigrams = generateTrigramString(query, " OR ")
+            val normalizedQuery = query.normalize()
             exec(
                 """
         SELECT a.group_id, a.artifact_id, v.version
         FROM artifacts_fuzzy_index f
         JOIN artifacts a ON a.id = f.rowid
         JOIN versions v ON a.id = v.artifact
-        WHERE artifacts_fuzzy_index MATCH '$trigrams'
+        WHERE artifacts_fuzzy_index MATCH '$normalizedQuery'
           AND v.is_latest = 1
         ORDER by rank ASC
         LIMIT $limit
@@ -221,15 +217,14 @@ class ArtifactStorage {
         ArtifactVersionMetadata(versions, latestVersion, releaseVersion)
     }
 
-    private fun generateTrigramString(word: String, separator: String = " "): String {
-        val input = word.lowercase().normalize()
-        return (0..input.length - 3).joinToString(separator) { i ->
-            input.substring(i, i + 3)
-        }
-    }
-
+    /**
+     * Normalizes a string to store/search in a Full-Text-Search database.
+     *
+     * * Input: `io.ktor:ktor-network`
+     * * Output: `ioktorktornetwork`
+     */
     fun String.normalize(): String {
-        return filter(Char::isLetterOrDigit)
+        return lowercase().filter(Char::isLetterOrDigit)
     }
 
     enum class StoreStrategy {

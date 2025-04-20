@@ -1,5 +1,6 @@
 package com.liarstudio.maven_indexer.parser
 
+import com.liarstudio.maven_indexer.indexer.parser.comparator.VersionComparator
 import com.liarstudio.maven_indexer.indexer.parser.XmlMetadataParser
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -7,7 +8,8 @@ import org.junit.jupiter.api.assertThrows
 
 class XmlMetadataParserTest {
 
-    private val parser = XmlMetadataParser()
+    private val versionComparator = VersionComparator()
+    private val parser = XmlMetadataParser(versionComparator = versionComparator)
 
     @Test
     fun `GIVEN valid metadata xml with latest and release WHEN parsed THEN returns correct metadata`() {

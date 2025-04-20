@@ -14,6 +14,7 @@ import com.liarstudio.maven_indexer.indexer.CsvArtifactIndexer
 import com.liarstudio.maven_indexer.indexer.FullMavenArtifactIndexer
 import com.liarstudio.maven_indexer.indexer.SingleArtifactIndexer
 import com.liarstudio.maven_indexer.indexer.VersionOnlyArtifactIndexer
+import com.liarstudio.maven_indexer.indexer.parser.comparator.VersionComparator
 import com.liarstudio.maven_indexer.indexer.extractor.ArtifactKmpTargetsExtractor
 import com.liarstudio.maven_indexer.indexer.extractor.HtmlPageLinkExtractor
 import com.liarstudio.maven_indexer.indexer.extractor.MavenMetadataExtractor
@@ -41,7 +42,8 @@ class CliApplication {
         val networkClient = NetworkClient()
         val artifactStorage = ArtifactStorage()
         val parseArtifact = ArtifactParamParser()
-        val xmlParser = XmlMetadataParser()
+        val versionComparator = VersionComparator()
+        val xmlParser = XmlMetadataParser(versionComparator)
 
         artifactStorage.initialize()
 
