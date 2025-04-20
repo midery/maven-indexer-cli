@@ -23,9 +23,17 @@ import com.liarstudio.maven_indexer.indexer.parser.XmlMetadataParser
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
-class CliApplication {
+/**
+ * Main class responsible for processing parsed commands from CLI.
+ */
+class CliCommandsProcessor {
 
-    fun run(
+    /**
+     * Processes all possible commands that this application supports via CLI.
+     *
+     * TODO: Introduce a DI framework for a handy instance creation.
+     */
+    fun process(
         index: Boolean?,
         indexGroup: String?,
         indexArtifact: String?,

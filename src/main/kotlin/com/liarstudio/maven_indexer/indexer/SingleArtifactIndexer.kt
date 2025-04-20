@@ -10,6 +10,13 @@ class SingleArtifactIndexer(
     private val artifactStorage: ArtifactStorage,
 ) {
 
+    /**
+     * Indexes a single artifact:
+     *  * Extracts meta-information for this artifact
+     *  * Saves this information to the local storage
+     *
+     * @return meta-information about the artifact
+     */
     suspend fun indexArtifact(artifact: Artifact): Result<ArtifactVersionMetadata> = runCatching {
         val versionMeta = mavenMetadataExtractor(artifact)
 

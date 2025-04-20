@@ -4,14 +4,20 @@ import com.liarstudio.maven_indexer.data.storage.ArtifactStorage
 import com.liarstudio.maven_indexer.indexer.parser.comparator.VersionComparator
 import com.liarstudio.maven_indexer.models.Artifact
 
+/**
+ * Processor for a CLI command of indexing multiple artifacts.
+ */
 class SearchVersionsCommandProcessor {
 
+    /**
+     * Searches for all available versions of a single artifact, and prints results in a sorted order.
+     */
     operator fun invoke(
         artifact: Artifact, artifactStorage: ArtifactStorage
     ) {
         val versionsMeta = artifactStorage.getArtifactVersions(artifact = artifact)
         if (versionsMeta.versions.isEmpty()) {
-            println("No versions found")
+            println("No versions found for $artifact")
             return
         } else {
             println("All Versions for '$artifact': ")

@@ -9,6 +9,11 @@ class ArtifactKmpTargetsExtractor(
     private val host: String = MAVEN_CENTRAL_REPO_URL,
 ) {
 
+    /**
+     * Extracts KMP targets from an artifact.
+     *
+     * **Algorithm**: go through each url in artifact group, and check if it is a valid kmp variant.
+     */
     suspend fun getKmpVariants(artifact: Artifact): List<Artifact> {
         return htmlPageLinkExtractor.invoke(artifact.getArtifactGroupUrl())
             .asSequence()
@@ -22,6 +27,17 @@ class ArtifactKmpTargetsExtractor(
 
     companion object {
 
+        /**
+         * Defines whether the artifact is a KMP variant of another artifact or not.
+         *
+         * Current implementation is defined by checking if an artifact is suffixed by predefined KMP-related
+         * platform targets.
+         *
+         * TODO: Current implementation is not scalable and may be easily broken,
+         *  as there's no required naming convention for KMP targets.
+         *  In order to correctly parse available kmp targets, we should parse .module file for each version of an artifact.
+         *  Example: https://repo.maven.apache.org/maven2/io/ktor/ktor-io/3.0.1/ktor-io-3.0.1.module
+         */
         fun String.isKmpVariationOf(originalArtifact: Artifact): Boolean {
             return KMP_TARGETS.any { suffix ->
                 this.equals(

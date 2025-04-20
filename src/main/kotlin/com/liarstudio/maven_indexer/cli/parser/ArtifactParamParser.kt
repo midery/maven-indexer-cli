@@ -3,6 +3,11 @@ package com.liarstudio.maven_indexer.cli.parser
 import com.liarstudio.maven_indexer.models.Artifact
 
 
+/**
+ * Parses artifact from a CLI parameter.
+ *
+ * Throws illegalStateException if it is specified in a wrong format.
+ */
 class ArtifactParamParser() {
 
     operator fun invoke(param: String): Artifact {

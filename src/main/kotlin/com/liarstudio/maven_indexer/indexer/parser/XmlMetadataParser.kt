@@ -30,7 +30,6 @@ class XmlMetadataParser(
     }
 
     private fun findLatestVersion(latestFromMetadata: String?, allVersions: List<String>): String? {
-        println("latestFromMetadata: $latestFromMetadata")
         return latestFromMetadata ?: return allVersions.maxWithOrNull(versionComparator)
     }
 }

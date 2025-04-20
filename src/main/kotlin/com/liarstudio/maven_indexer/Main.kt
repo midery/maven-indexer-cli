@@ -1,6 +1,6 @@
 package com.liarstudio.maven_indexer
 
-import com.liarstudio.maven_indexer.cli.CliApplication
+import com.liarstudio.maven_indexer.cli.CliCommandsProcessor
 import com.liarstudio.maven_indexer.cli.logger.LogLevel
 import kotlinx.cli.*
 
@@ -8,14 +8,18 @@ fun main(args: Array<String>) {
     val parser = ArgParser("maven-indexer")
 
     val index by parser.option(
-        ArgType.Boolean, shortName = "i", description = "Index all dependencies from Maven Central"
+        ArgType.Boolean, shortName = "i", description = "Index all dependencies from Maven Central." +
+                "This method will crawl through each artifact in Maven Central and get its meta-information." +
+                "\n\tEstimated time: ~40 minutes."
     )
 
     val indexGroup by parser.option(
         ArgType.String,
         shortName = "ig",
-        description = "Index all dependencies for particular groupId from Maven Central." +
-                "Example input: io.ktor"
+        description = "Index all dependencies for particular groupId from Maven Central.\n\t" +
+                "Example input: io.ktor\n\t" +
+                "This method can be used if you don't wish to wait until the whole maven central finishes indexing," +
+                "and should work significantly faster then `index`."
     )
 
     val indexArtifact by parser.option(
@@ -31,7 +35,8 @@ fun main(args: Array<String>) {
     val refresh by parser.option(
         ArgType.Boolean,
         shortName = "r",
-        description = "Refreshes already indexed artifact versions. This action should be faster than refreshing whole Maven Central, and can be performed periodically."
+        description = "Refreshes already indexed artifact versions. This action should be faster than refreshing whole Maven Central, and can be performed periodically." +
+                "\n\tEstimated time: ~15 minutes."
     )
 
     val search by parser.option(
@@ -49,14 +54,14 @@ fun main(args: Array<String>) {
     )
 
     val logLevel by parser.option(
-        ArgType.Choice<LogLevel>(), shortName = "log", description = "Specife desired log  level. "
+        ArgType.Choice<LogLevel>(), shortName = "log", description = "Specifies desired log  level. "
     )
         .default(LogLevel.warn)
 
     parser.parse(args)
 
-    CliApplication()
-        .run(
+    CliCommandsProcessor()
+        .process(
             index = index,
             indexGroup = indexGroup,
             indexFromCsv = indexFromCsv,

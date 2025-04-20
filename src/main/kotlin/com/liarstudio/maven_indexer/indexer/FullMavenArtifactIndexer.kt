@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +21,28 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * TODO: Test this logic
+ * Indexes full maven repository from [host].
+ *
+ * **Algorithm:** goes through each link one by one and check if the link points on artifact's metadata file.
+ * If yes - this is a terminal point, we can extract all the artifact information from the metadata and save it.
+ *
+ * We use `BFS` algorithm to crawl through the pages, and use [Channel] with unlimited capacity that acts as a queue and
+ * helps us to process in parallel. Number of parallel requests is limited by [PARALLELISM] field.
+ *
+ * In order to finish parallel execution correctly, we keep track of active tasks and state of the [Channel] in another
+ * job called [waitForCompletion]. It periodically checks if active tasks and channel are empty,
+ * and if this condition is met - finishes it.
+ *
+ * TODO:
+ *  * Improve performance: profile the current setup and think about weak poinrs (better parallelization, batch insert, etc)
+ *  * Better error handling
+ *  * Save results/errors in a text file, so it can be investigated after the execution.
+ *
+ *  @param host base maven host
+ *  @param additionalPath additional path to shorten the search.
+ *      For example, you can specify a specific group/artifact to crawl only inside it.
+ *  @param indexer indexer for a single artifact to parse metadata and save it locally.
+ *  @param htmlPageLinkExtractor - class used to extract links from html pages
  */
 class FullMavenArtifactIndexer(
     private val host: String = MAVEN_CENTRAL_REPO_URL,
@@ -32,10 +54,10 @@ class FullMavenArtifactIndexer(
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
     override suspend fun index(): Flow<Progress> = channelFlow {
-        val urlHandleChannel = Channel<String>(capacity = Channel.UNLIMITED)
-        val progressChannel = channel
-        val visited = ConcurrentHashMap.newKeySet<String>()
-        val activeTasks = AtomicInteger(0)
+        val urlHandleChannel = Channel<String>(capacity = UNLIMITED) // Acts as an asynchronous queue in our BFS search
+        val progressChannel = channel // Used to send progress to a client
+        val visited = ConcurrentHashMap.newKeySet<String>() // Used to filter already visited pages
+        val activeTasks = AtomicInteger(0) // Used to track active tasks and to finish the execution
         val progressArtifactCount = AtomicInteger(0)
         val errorsCount = AtomicInteger(0)
 
@@ -90,11 +112,7 @@ class FullMavenArtifactIndexer(
                 return
             }
 
-        try {
-            logger.debug("Found links: ${links.size}")
-        } catch (e: Exception) {
-            throw IllegalStateException("Failed processing $url: ${e.message}")
-        }
+        logger.debug("Found links: ${links.size}")
 
         val artifactMetadata = links.find { link -> link.endsWith(MAVEN_METADATA_FILE) }
         if (artifactMetadata != null) {
@@ -145,6 +163,10 @@ class FullMavenArtifactIndexer(
         return null
     }
 
+    /**
+     * Waits for a completion of a main job and closes [urlHandleChannel] once there's no active tasks
+     * and the channel is empty.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun waitForCompletion(
         activeTasks: AtomicInteger,

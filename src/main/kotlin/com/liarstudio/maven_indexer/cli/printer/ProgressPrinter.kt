@@ -2,6 +2,9 @@ package com.liarstudio.maven_indexer.cli.printer
 
 import com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer.Progress
 
+/**
+ * Renders progress from [com.liarstudio.maven_indexer.indexer.MultipleArtifactIndexer], printing it to the console.
+ */
 class ProgressRenderer {
 
     fun render(progress: Progress) {

@@ -7,6 +7,9 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 
+/**
+ * Simple abstraction over [HttpClient] to run requests through the network.
+ */
 class NetworkClient {
 
     private val client = HttpClient(CIO) {
@@ -21,5 +24,8 @@ class NetworkClient {
         expectSuccess = false
     }
 
+    /**
+     * Gets text body from the [url].
+     */
     suspend fun getBody(url: String) = client.get(url).bodyAsText()
 }

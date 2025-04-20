@@ -12,6 +12,18 @@ import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * [MultipleArtifactIndexer] which uses a CSV file as a data source for an artifacts.
+ *
+ * It reads through the file, extracts all the possible kmp targets from each artifact, and indexes them in parallel.
+ *
+ * This indexer sends progress in 3 stages:
+ * 1. Reading artifacts from CSV (0/1)
+ * 2. Extracting KMP variants (0/N)
+ * 3. Fetching versions (0/M)
+ *
+ * All the stages are sequential, but the work inside them is done in parallel.
+ */
 class CsvArtifactIndexer(
     private val csvFile: File,
     private val indexer: SingleArtifactIndexer,
@@ -19,6 +31,9 @@ class CsvArtifactIndexer(
     private val kmpVariantsExtractor: ArtifactKmpTargetsExtractor,
 ) : MultipleArtifactIndexer {
 
+    /**
+     * Semaphore here is to limit a number of parallel requests to not our networking layer.
+     */
     private val semaphore = Semaphore(permits = PARALLELISM)
 
     override suspend fun index(): Flow<Progress> = channelFlow {
@@ -74,7 +89,7 @@ class CsvArtifactIndexer(
     }
 
     companion object {
-        private const val PARALLELISM = 64
+        private const val PARALLELISM = 256
 
         private val readFileStageProgress =
             Progress.Staged("Reading artifacts from CSV", 1, 3, Progress.Simple(0, 1))

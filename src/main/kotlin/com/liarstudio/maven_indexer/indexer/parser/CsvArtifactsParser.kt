@@ -5,6 +5,11 @@ import com.opencsv.CSVReaderHeaderAware
 import java.io.File
 import java.io.FileReader
 
+/**
+ * Parses artifacts CSV with a strict format:
+ *
+ * * 2 columns: `namespace`, `name`
+ */
 class CsvArtifactsParser {
 
     operator fun invoke(csvFile: File): List<Artifact> {
